@@ -46,6 +46,25 @@ impl From<Date> for DATE {
     }
 }
 
+pub struct DecWrapper(Decimal);
+
+impl DecWrapper {
+    pub fn unwrap(self) -> Decimal {
+        self.0
+    }
+}
+
+impl From<DECIMAL> for DecWrapper {
+    fn from(d: DECIMAL) -> DecWrapper {
+        DecWrapper(build_rust_decimal(d))
+    }
+}
+
+impl From<DecWrapper> for DECIMAL {
+    fn from(d: DecWrapper) -> DECIMAL {
+        build_c_decimal(d.0)
+    }
+}
 
 pub fn build_c_decimal(dec: Decimal) -> DECIMAL {
     let scale = dec.scale() as u8;
@@ -80,6 +99,9 @@ pub fn build_rust_decimal(dec: DECIMAL) -> Decimal {
                         sign,
                         dec.scale as u32 ) 
 }
+
+pub type Int = i32;
+pub type UInt = u32;
 
 #[cfg(test)]
 mod tests {
