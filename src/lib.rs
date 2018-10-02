@@ -5,4 +5,3 @@ extern crate winapi;
 mod ptr;
 mod types;
 mod variant;
-mod vartype;
