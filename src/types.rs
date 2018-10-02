@@ -102,6 +102,7 @@ pub fn build_rust_decimal(dec: DECIMAL) -> Decimal {
 
 pub type Int = i32;
 pub type UInt = u32;
+pub type SCode = i32;
 
 #[cfg(test)]
 mod tests {
