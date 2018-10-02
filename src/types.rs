@@ -8,7 +8,7 @@
 
 use rust_decimal::Decimal;
 
-use winapi::shared::wtypes::{CY, DATE, DECIMAL, DECIMAL_NEG};
+use winapi::shared::wtypes::{CY, DATE, DECIMAL, DECIMAL_NEG, VARIANT_BOOL};
 
 #[derive(Debug, Clone, Copy, Hash, PartialOrd, PartialEq)]
 pub struct Currency(pub i64);
@@ -98,6 +98,32 @@ pub fn build_rust_decimal(dec: DECIMAL) -> Decimal {
                         dec.Hi32, 
                         sign,
                         dec.scale as u32 ) 
+}
+
+pub struct VariantBool(bool);
+
+impl From<VariantBool> for VARIANT_BOOL {
+    fn from(vb: VariantBool) -> VARIANT_BOOL {
+        if vb.0 {-1} else {0}
+    }
+}
+
+impl From<VARIANT_BOOL> for VariantBool {
+    fn from(vb: VARIANT_BOOL) -> VariantBool {
+        VariantBool(vb < 0) 
+    }
+}
+
+impl From<bool> for VariantBool {
+    fn from(b: bool) -> Self {
+        VariantBool(b)
+    }
+}
+
+impl From<VariantBool> for bool {
+    fn from(b: VariantBool) -> Self {
+        b.0
+    }
 }
 
 pub type Int = i32;
