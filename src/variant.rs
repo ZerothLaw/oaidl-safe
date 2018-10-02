@@ -1,15 +1,12 @@
 use std::mem;
 use std::ptr::NonNull;
 
-use rust_decimal::Decimal;
-
 use winapi::ctypes::c_void;
-
 
 use winapi::shared::wtypes::{
     CY, DATE, DECIMAL,
     VARIANT_BOOL,
-    VT_ARRAY, 
+    //VT_ARRAY, 
     VT_BSTR, 
     VT_BOOL,
     VT_BYREF, 
@@ -27,7 +24,7 @@ use winapi::shared::wtypes::{
     VT_NULL,
     VT_R4, 
     VT_R8, 
-    VT_RECORD,
+    //VT_RECORD,
     VT_UI1,
     VT_UI2,
     VT_UI4,
@@ -55,7 +52,7 @@ pub const VT_PBOOL: u32 = VT_BYREF | VT_BOOL;
 pub const VT_PERROR: u32 = VT_BYREF | VT_ERROR;
 pub const VT_PCY: u32 = VT_BYREF | VT_CY;
 pub const VT_PDATE: u32 = VT_BYREF | VT_DATE;
-pub const VT_PBSTR: u32 = VT_BYREF | VT_BSTR;
+//pub const VT_PBSTR: u32 = VT_BYREF | VT_BSTR;
 pub const VT_PUNKNOWN: u32 = VT_BYREF | VT_UNKNOWN;
 pub const VT_PDISPATCH: u32 = VT_BYREF | VT_DISPATCH;
 pub const VT_PDECIMAL: u32 = VT_BYREF | VT_DECIMAL;
@@ -571,147 +568,6 @@ impl From<Variant> for VARIANT {
 
 impl From<VARIANT> for Variant {
     fn from(v: VARIANT) -> Variant {
-        /*
-            let mut n1 = vt.n1;
-        
-        let vt: VARTYPE = unsafe {
-            let n2_mut = n1.n2_mut();
-            n2_mut.vt
-        };
-        let mut n3 = unsafe {
-            let n2_mut = n1.n2_mut();   
-            n2_mut.n3
-        };
-        //have to special case bool/pbool conversions because of VARIANT_BOOL
-        match vt as u32 {
-            VT_I8 => BRANCH_FROM_RAW!{S, LongLong(n3, llVal)},
-            VT_I4 => BRANCH_FROM_RAW!{S, Long(n3, lVal)}, 
-            VT_UI1 => BRANCH_FROM_RAW!{S, Byte(n3, bVal)},
-            VT_I2 => BRANCH_FROM_RAW!{S, Short(n3, iVal)},
-            VT_R4 => BRANCH_FROM_RAW!{S, Float(n3, fltVal)}, 
-            VT_R8 => BRANCH_FROM_RAW!{S, Double(n3, dblVal)}, 
-            VT_BOOL => BRANCH_FROM_RAW!{C, |val| {
-                Variant::Bool(val == -1)
-            };(n3, boolVal)}, 
-            VT_ERROR => BRANCH_FROM_RAW!{C, |val| {
-                Variant::ErrorCode(SCode(val))
-            }; (n3, scode)},
-            VT_CY => BRANCH_FROM_RAW!{C, |val| {
-                Variant::Currency(Currency::from(val))
-            }; (n3, cyVal)},
-            VT_DATE => BRANCH_FROM_RAW!{C, |val| {
-                Variant::Date(Date(val))
-            }; (n3, date)},
-            VT_BSTR => BRANCH_FROM_RAW!{C, |val| {
-                let bs = bstring::BString::from_ptr_safe(val);
-                Variant::BString(bs.to_string())
-            }; (n3, bstrVal)},
-            VT_UNKNOWN => BRANCH_FROM_RAW!{S, Unknown(n3, punkVal)}, 
-            VT_DISPATCH => BRANCH_FROM_RAW!{S, Dispatch(n3, pdispVal)}, 
-            VT_ARRAY => BRANCH_FROM_RAW!{C, |val| {
-                let rsa: RSafeArray<i32> = RSafeArray::from(val);
-                Variant::Array(rsa)
-            }; (n3, parray)}, 
-            VT_PBYTE => BRANCH_FROM_RAW!{C, |val: *mut u8| {
-                Variant::PByte(Box::new(unsafe{*val}))
-            }; (n3, pbVal) },
-            VT_PSHORT => BRANCH_FROM_RAW!{C, |val: *mut i16| {
-                Variant::PShort(Box::new(unsafe{*val}))
-            }; (n3, piVal) },
-            VT_PLONG => BRANCH_FROM_RAW!{C, |val: *mut i32| {
-                Variant::PLong(Box::new(unsafe{*val}))
-            } ; (n3, plVal) },
-            VT_PLONGLONG => BRANCH_FROM_RAW!{C, |val: *mut i64| {
-                Variant::PLongLong(Box::new(unsafe{*val}))
-            }; (n3, pllVal)}, 
-            VT_PFLOAT => BRANCH_FROM_RAW!{C, |val: *mut f32| {
-                Variant::PFloat(Box::new(unsafe{*val}))
-            }; (n3, pfltVal)},
-            VT_PDOUBLE => BRANCH_FROM_RAW!{C, |val: *mut f64| {
-                Variant::PDouble(Box::new(unsafe{*val}))
-            }; (n3, pdblVal)},
-            VT_PBOOL => BRANCH_FROM_RAW!{C, |val: *mut VARIANT_BOOL| {
-                Variant::PBool(Box::new(unsafe{*val}  == -1))
-            }; (n3, pboolVal)},
-            VT_PERROR => BRANCH_FROM_RAW!{C, |val: *mut SCODE| {
-                Variant::PErrorCode(Box::new(SCode(unsafe{*val})))
-            } ; (n3, pscode)},
-            VT_PCY => BRANCH_FROM_RAW!{C, |val: *mut CY| {
-                Variant::PCurrency(Box::new(Currency::from(unsafe{*val})))
-            } ; (n3, pcyVal)},
-            VT_PDATE => BRANCH_FROM_RAW!{C, |val: *mut DATE| {
-                Variant::PDate(Box::new(Date(unsafe{*val})))
-            }; (n3, pdate)},
-            VT_PBSTR => BRANCH_FROM_RAW!{C, |val: *mut BSTR| {
-                Variant::PBString(
-                    Box::new(
-                        bstring::BString::from_ptr_safe(
-                            unsafe{
-                                *val
-                            }
-                        ).to_string()
-                    )
-                )
-            }; (n3, pbstrVal )},
-            VT_PUNKNOWN => BRANCH_FROM_RAW!{C, |val: *mut *mut IUnknown| {
-                Variant::PUnknown(Box::new(unsafe{*val}))
-                }; (n3, ppunkVal_mut)},
-            VT_PDISPATCH => BRANCH_FROM_RAW!{C, |val: *mut *mut IDispatch| {
-                Variant::PDispatch(Box::new(unsafe{*val}))
-                }; (n3, ppdispVal_mut)},
-            VT_PARRAY => BRANCH_FROM_RAW!{C, |val: *mut *mut SAFEARRAY| {
-                Variant::PArray(Box::new(RSafeArray::from(unsafe{*val})))
-                }; (n3, pparray)},
-            VT_PVARIANT => BRANCH_FROM_RAW!{C, |val: *mut VARIANT | {
-                Variant::PVariant(Box::new(Variant::from_c_variant(unsafe{*val})))
-                }; (n3, pvarVal)},
-            VT_BYREF => BRANCH_FROM_RAW!{C, |val: *mut c_void| {
-                Variant::ByRef(val)}; (n3, byref)
-                },
-            VT_I1 => BRANCH_FROM_RAW!{S, Char(n3, cVal)},
-            VT_UI2 => BRANCH_FROM_RAW!{S, UShort(n3, uiVal)},
-            VT_UI4 => BRANCH_FROM_RAW!{S, ULong(n3, ulVal)},
-            VT_UI8 => BRANCH_FROM_RAW!{S, ULongLong(n3, ullVal)},
-            VT_INT => BRANCH_FROM_RAW!{C, |val| { 
-                Variant::Int(Int(val)) 
-                };(n3, intVal)},
-            VT_UINT => BRANCH_FROM_RAW!{C, |val|{
-                Variant::UInt(UInt(val)) 
-                };(n3, uintVal)},
-            VT_PDECIMAL => BRANCH_FROM_RAW!{C, |val: *mut DECIMAL| {
-                Variant::PDecimal(Box::new(build_rust_decimal(unsafe{*val})))
-                }; (n3, pdecVal)},
-            VT_PCHAR => BRANCH_FROM_RAW!{C, |val: *mut i8| {
-                Variant::PChar(Box::new(unsafe{*val}))
-                }; (n3, pcVal)},
-            VT_PUSHORT => BRANCH_FROM_RAW!{C, |val: *mut u16| {
-                Variant::PUShort(Box::new(unsafe{*val}))
-                }; (n3, puiVal)},
-            VT_PULONG => BRANCH_FROM_RAW!{C, |val: *mut u32| {
-                Variant::PULong(Box::new(unsafe{*val}))
-                }; (n3, pulVal)},
-            VT_PULONGLONG => BRANCH_FROM_RAW!{C, |val: *mut u64| {
-                Variant::PULongLong(Box::new(unsafe{*val}))
-                }; (n3, pullVal)},
-            VT_PINT => BRANCH_FROM_RAW!{C, |val: *mut i32| {
-                Variant::PInt(Box::new(Int(unsafe{*val})))
-                }; (n3, pintVal)},
-            VT_PUINT => BRANCH_FROM_RAW!{C, |val: *mut u32| {
-                Variant::PUInt(Box::new(UInt(unsafe{*val})))
-                }; (n3, puintVal)},
-            VT_DECIMAL => BRANCH_FROM_RAW!{C, |val: DECIMAL| {
-                let new_val = build_rust_decimal(val);
-                Variant::Decimal(new_val)
-            }; (n1, decVal)},
-            VT_EMPTY => {
-                Variant::Empty(())
-            }, 
-            VT_NULL => {
-                Variant::Null(())
-            },
-            _ => panic!("Unknown vartype: {}", vt)
-        }
-        */
         let mut n1 = v.n1;
 
         let vt = unsafe {

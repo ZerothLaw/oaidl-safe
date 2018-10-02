@@ -4,6 +4,5 @@ version = "0.1.0"
 authors = ["ZerothLaw <trinioler@gmail.com>"]
 
 [dependencies]
-lazy_static = "1.1.0"
 rust_decimal = "0.10.1"
 winapi = {version = "0.3.6", features = ["oaidl", "wtypes"]}
