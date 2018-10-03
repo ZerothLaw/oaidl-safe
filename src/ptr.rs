@@ -20,7 +20,7 @@ impl<T> Ptr<T> {
         }
     }
 
-    pub fn as_ptr(self) -> *mut T {
+    pub fn as_ptr(&self) -> *mut T {
         self.inner.as_ptr()
     }
 

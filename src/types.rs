@@ -141,8 +141,8 @@ mod tests {
         assert_eq!(format!("{}", d), "1208925819333149903028225" );
         
         let c = build_c_decimal(d);
-        println!("({}, {}, {}, {})", c.Hi32, c.Lo64, c.scale, c.sign);
-        println!("{:?}", d.serialize());
+        //println!("({}, {}, {}, {})", c.Hi32, c.Lo64, c.scale, c.sign);
+        //println!("{:?}", d.serialize());
         assert_eq!(c.Hi32, 65535);
         assert_eq!(c.Lo64, 18446462594437873665); 
         assert_eq!(c.scale, 0);
@@ -159,7 +159,7 @@ mod tests {
             Lo64: 18446462594437873665
         };
         let new_d = build_rust_decimal(d);
-        println!("{:?}", new_d.serialize());
+        //println!("{:?}", new_d.serialize());
        // assert_eq!(new_d.is_sign_positive(), true);
         assert_eq!(format!("{}", new_d), "1208925819333149903028225"  );
     }
