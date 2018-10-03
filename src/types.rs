@@ -66,6 +66,24 @@ impl From<DecWrapper> for DECIMAL {
     }
 }
 
+impl<'d> From<&'d mut DecWrapper> for DECIMAL {
+    fn from(d: & mut DecWrapper) -> DECIMAL {
+        build_c_decimal(d.0)
+    }
+}
+
+impl From<DecWrapper> for Decimal {
+    fn from(dw: DecWrapper) -> Decimal {
+        dw.0
+    }
+}
+
+impl From<Decimal> for DecWrapper {
+    fn from(dec: Decimal) -> DecWrapper {
+        DecWrapper(dec)
+    }
+}
+
 pub fn build_c_decimal(dec: Decimal) -> DECIMAL {
     let scale = dec.scale() as u8;
     let sign = if dec.is_sign_positive() {0} else {DECIMAL_NEG};

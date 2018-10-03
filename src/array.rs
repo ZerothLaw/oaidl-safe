@@ -1,22 +1,21 @@
-use std::fmt::Display;
 use std::ptr::null_mut;
 use rust_decimal::Decimal;
 
 use winapi::ctypes::{c_long, c_void};
 use winapi::shared::minwindef::{UINT, ULONG,};
 use winapi::shared::ntdef::HRESULT;
-use winapi::shared::wtypes::{DATE, CY,  VARTYPE};
+use winapi::shared::wtypes::{DATE, DECIMAL, CY,  VARTYPE};
 use winapi::um::oaidl::{IDispatch, SAFEARRAYBOUND, LPSAFEARRAYBOUND, SAFEARRAY};
 use winapi::um::unknwnbase::IUnknown;
 
 
 use ptr::Ptr;
 use types::{Currency, Date, DecWrapper, VariantBool};
-use variant::Variant;
+//use variant::Variant;
 
 use winapi::shared::wtypes::{
     VARIANT_BOOL,
-    VT_BSTR, 
+    //VT_BSTR, 
     VT_BOOL,
     VT_CY,
     VT_DATE,
@@ -32,7 +31,7 @@ use winapi::shared::wtypes::{
     VT_UI2,
     VT_UI4,
     VT_UNKNOWN, 
-    VT_VARIANT,   
+    //VT_VARIANT,   
 };
 
 
@@ -44,13 +43,13 @@ pub trait SafeArrayElement: Sized {
     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self, i32>;
 }
 
-pub struct SafeArr<T: SafeArrayElement> {
+pub struct SafeArray<T: SafeArrayElement> {
     array: Vec<T>
 }
 
-impl<T: SafeArrayElement> SafeArr<T> {
-    pub fn new(arr: Vec<T>) -> SafeArr<T> {
-        SafeArr { array: arr }
+impl<T: SafeArrayElement> SafeArray<T> {
+    pub fn new(arr: Vec<T>) -> SafeArray<T> {
+        SafeArray { array: arr }
     }
 
     pub fn unwrap(self) -> Vec<T> {
@@ -73,14 +72,14 @@ impl<T: SafeArrayElement> SafeArr<T> {
         Ok(Ptr::with_checked(psa).unwrap())
     }
 
-    pub fn from_safearray(psa: *mut SAFEARRAY) -> Result<SafeArr<T>, i32> {
+    pub fn from_safearray(psa: *mut SAFEARRAY) -> Result<SafeArray<T>, i32> {
         let sa_dims = unsafe { SafeArrayGetDim(psa) };
         assert!(sa_dims > 0); //Assert its not a dimensionless sa
-        let vt = unsafe {
+        /*let vt = unsafe {
             let mut vt: VARTYPE = 0;
             let _hr = SafeArrayGetVartype(psa, &mut vt);
             vt
-        };
+        };*/
         if sa_dims == 1 {
             let (l_bound, r_bound) = unsafe {
                 let mut l_bound: c_long = 0;
@@ -97,7 +96,7 @@ impl<T: SafeArrayElement> SafeArr<T> {
                     Err(hr) => return Err(hr)
                 }
             }
-            Ok(SafeArr::new(vc))
+            Ok(SafeArray::new(vc))
         } else {
             panic!("Multiple dimension arrays not yet supported.")
         }
@@ -253,8 +252,34 @@ safe_arr_impl!(Ptr<IUnknown> => VT_UNKNOWN,
         }
     }
 );
-// safe_arr_impl!(Decimal => VT_DECIMAL);
-// safe_arr_impl!(DecWrapper => VT_DECIMAL);
+safe_arr_impl!(Decimal => VT_DECIMAL, 
+    {
+        |psa, ix|{
+            let mut dec: DECIMAL = DECIMAL::from(DecWrapper::from(Decimal::new(0, 0)));
+            let hr = SafeArrayGetElement(psa, &ix, &mut dec as *mut _ as *mut c_void);
+            (hr, Decimal::from(DecWrapper::from(dec)))
+        }
+    } <=> {
+        |slf: &mut Decimal, psa, ix| {
+            let mut dec: DECIMAL =  DECIMAL::from(DecWrapper::from(*slf));
+            SafeArrayPutElement(psa, &ix, &mut dec as *mut _ as *mut c_void)
+        }
+    }
+);
+safe_arr_impl!(DecWrapper => VT_DECIMAL, 
+    {
+        |psa, ix|{
+            let mut dec: DECIMAL = DECIMAL::from(DecWrapper::from(Decimal::new(0, 0)));
+            let hr = SafeArrayGetElement(psa, &ix, &mut dec as *mut _ as *mut c_void);
+            (hr, DecWrapper::from(dec))
+        }
+    } <=> {
+        |slf: &mut DecWrapper, psa, ix| {
+            let mut dec: DECIMAL =  DECIMAL::from(slf);
+            SafeArrayPutElement(psa, &ix, &mut dec as *mut _ as *mut c_void)
+        }
+    }
+);
 safe_arr_impl!(i8 => VT_I1, 
     {
         |psa, ix|{
@@ -340,11 +365,11 @@ mod test {
     fn test_create() {
         let v: Vec<i8> = vec![0,1,2,3,4];
         println!("{:?}", v);
-        let mut sa = SafeArr::new(v);
+        let sa = SafeArray::new(v);
         let p = sa.into_safearray().unwrap();
         println!("{:p}", p.as_ptr());
 
-        let r = SafeArr::<i8>::from_safearray(p.as_ptr());
+        let r = SafeArray::<i8>::from_safearray(p.as_ptr());
         println!("{:?}", r.unwrap().unwrap());
     }
 
