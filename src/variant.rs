@@ -119,22 +119,7 @@ impl VariantType for () {
 }
 
 macro_rules! impl_variant {
-    (for $t:ty => $vt:expr, from: {$from:expr} <=> into: {$into:expr}) => {
-        impl VariantType for $t {
-            const VARTYPE: u32 = $vt;
-            
-            fn from_variant(n3: &VARIANT_n3, n1: &VARIANT_n1) -> Result<Self, ()>{
-                unsafe {$from(n3, n1)}
-            }
-
-            fn into_variant(self, n3: &mut VARIANT_n3, n1: &mut VARIANT_n1) {
-                unsafe {$into(self, n3, n1)}
-            }
-        }
-        
-    };
-
-    (for($tb:ident : $tc:path) $t:ty => $vt:expr, from: {$from:expr} <=> into: {$into:expr}) => {
+    (for($tb:ident : $tc:ident) $t:ty => $vt:expr, from: {$from:expr} <=> into: {$into:expr}) => {
         impl<$tb: $tc> VariantType for $t {
             const VARTYPE: u32 = $vt;
             
@@ -147,6 +132,19 @@ macro_rules! impl_variant {
             }
         }
         
+    };
+    (for $t:ty => $vt:expr, from: {$from:expr} <=> into: {$into:expr}) => {
+        impl VariantType for $t {
+            const VARTYPE: u32 = $vt;
+            
+            fn from_variant(n3: &VARIANT_n3, n1: &VARIANT_n1) -> Result<Self, ()>{
+                unsafe {$from(n3, n1)}
+            }
+
+            fn into_variant(self, n3: &mut VARIANT_n3, n1: &mut VARIANT_n1) {
+                unsafe {$into(self, n3, n1)}
+            }
+        }  
     };
 }
 
@@ -470,19 +468,16 @@ impl_variant!(for Box<Ptr<IDispatch>> => VT_PUNKNOWN,
     }
 );
 
-impl_variant!(for(T:VariantType) Box<Variant2<T>> => VT_PUNKNOWN, 
+impl_variant!(for(T : VariantType) Variant2<T> => VT_VARIANT, 
     from: {
         |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.ppdispVal();
-            match NonNull::new((**n_ptr).clone()) {
-                Some(nn) => Ok(Box::new(Ptr::new(nn))), 
-                None => Err(())
-            }
+            let n_ptr = n3.pvarVal();
+            Variant2::<T>::from_variant(**n_ptr)
         }
     } <=> into: {
-        |slf: Box<Variant2<T>>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.ppdispVal_mut();
-            let bptr = Box::new((*slf).as_ptr());
+        |slf: Variant2<T>, n3: &mut VARIANT_n3, _n1| {
+            let n_ptr = n3.pvarVal_mut();
+            let bptr = Box::new(slf.into_variant().unwrap());
             *n_ptr = Box::into_raw(bptr);
         }
     }
