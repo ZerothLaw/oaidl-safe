@@ -1,16 +1,134 @@
+/// 
+/// Reference:
+/// typedef struct tagVARIANT {
+///     union {
+///         struct {
+///             VARTYPE vt;
+///             WORD    wReserved1;
+///             WORD    wReserved2;
+///             WORD    wReserved3;
+///             union {
+///                 LONGLONG     llVal;
+///                 LONG         lVal;
+///                 BYTE         bVal;
+///                 SHORT        iVal;
+///                 FLOAT        fltVal;
+///                 DOUBLE       dblVal;
+///                 VARIANT_BOOL boolVal;
+///                 SCODE        scode;
+///                 CY           cyVal;
+///                 DATE         date;
+///                 BSTR         bstrVal;
+///                 IUnknown     *punkVal;
+///                 IDispatch    *pdispVal;
+///                 SAFEARRAY    *parray;
+///                 BYTE         *pbVal;
+///                 SHORT        *piVal;
+///                 LONG         *plVal;
+///                 LONGLONG     *pllVal;
+///                 FLOAT        *pfltVal;
+///                 DOUBLE       *pdblVal;
+///                 VARIANT_BOOL *pboolVal;
+///                 SCODE        *pscode;
+///                 CY           *pcyVal;
+///                 DATE         *pdate;
+///                 BSTR         *pbstrVal;
+///                 IUnknown     **ppunkVal;
+///                 IDispatch    **ppdispVal;
+///                 SAFEARRAY    **pparray;
+///                 VARIANT      *pvarVal;
+///                 PVOID        byref;
+///                 CHAR         cVal;
+///                 USHORT       uiVal;
+///                 ULONG        ulVal;
+///                 ULONGLONG    ullVal;
+///                 INT          intVal;
+///                 UINT         uintVal;
+///                 DECIMAL      *pdecVal;
+///                 CHAR         *pcVal;
+///                 USHORT       *puiVal;
+///                 ULONG        *pulVal;
+///                 ULONGLONG    *pullVal;
+///                 INT          *pintVal;
+///                 UINT         *puintVal;
+///                 struct {
+///                     PVOID       pvRecord;
+///                     IRecordInfo *pRecInfo;
+///                 } __VARIANT_NAME_4;
+///             } __VARIANT_NAME_3;
+///         } __VARIANT_NAME_2;
+///         DECIMAL decVal;
+///     } __VARIANT_NAME_1;
+/// } VARIANT;
+/*
+* VARENUM usage key,
+*
+* * [V] - may appear in a VARIANT
+* * [T] - may appear in a TYPEDESC
+* * [P] - may appear in an OLE property set
+* * [S] - may appear in a Safe Array
+*
+*
+*  VT_EMPTY            [V]   [P]     nothing
+*  VT_NULL             [V]   [P]     SQL style Null
+*  VT_I2               [V][T][P][S]  2 byte signed int
+*  VT_I4               [V][T][P][S]  4 byte signed int
+*  VT_R4               [V][T][P][S]  4 byte real
+*  VT_R8               [V][T][P][S]  8 byte real
+*  VT_CY               [V][T][P][S]  currency
+*  VT_DATE             [V][T][P][S]  date
+*  VT_BSTR             [V][T][P][S]  OLE Automation string
+*  VT_DISPATCH         [V][T]   [S]  IDispatch *
+*  VT_ERROR            [V][T][P][S]  SCODE
+*  VT_BOOL             [V][T][P][S]  True=-1, False=0
+*  VT_VARIANT          [V][T][P][S]  VARIANT *
+*  VT_UNKNOWN          [V][T]   [S]  IUnknown *
+*  VT_DECIMAL          [V][T]   [S]  16 byte fixed point
+*  VT_RECORD           [V]   [P][S]  user defined type
+*  VT_I1               [V][T][P][s]  signed char
+*  VT_UI1              [V][T][P][S]  unsigned char
+*  VT_UI2              [V][T][P][S]  unsigned short
+*  VT_UI4              [V][T][P][S]  ULONG
+*  VT_I8                  [T][P]     signed 64-bit int
+*  VT_UI8                 [T][P]     unsigned 64-bit int
+*  VT_INT              [V][T][P][S]  signed machine int
+*  VT_UINT             [V][T]   [S]  unsigned machine int
+*  VT_INT_PTR             [T]        signed machine register size width
+*  VT_UINT_PTR            [T]        unsigned machine register size width
+*  VT_VOID                [T]        C style void
+*  VT_HRESULT             [T]        Standard return type
+*  VT_PTR                 [T]        pointer type
+*  VT_SAFEARRAY           [T]        (use VT_ARRAY in VARIANT)
+*  VT_CARRAY              [T]        C style array
+*  VT_USERDEFINED         [T]        user defined type
+*  VT_LPSTR               [T][P]     null terminated string
+*  VT_LPWSTR              [T][P]     wide null terminated string
+*  VT_FILETIME               [P]     FILETIME
+*  VT_BLOB                   [P]     Length prefixed bytes
+*  VT_STREAM                 [P]     Name of the stream follows
+*  VT_STORAGE                [P]     Name of the storage follows
+*  VT_STREAMED_OBJECT        [P]     Stream contains an object
+*  VT_STORED_OBJECT          [P]     Storage contains an object
+*  VT_VERSIONED_STREAM       [P]     Stream with a GUID version
+*  VT_BLOB_OBJECT            [P]     Blob contains an object 
+*  VT_CF                     [P]     Clipboard format
+*  VT_CLSID                  [P]     A Class ID
+*  VT_VECTOR                 [P]     simple counted array
+*  VT_ARRAY            [V]           SAFEARRAY*
+*  VT_BYREF            [V]           void* for local use
+*  VT_BSTR_BLOB                      Reserved for system use
+*/
 use std::mem;
 use std::ptr::NonNull;
 
 use rust_decimal::Decimal;
 
 use winapi::ctypes::c_void;
-
 use winapi::shared::wtypes::{
     CY, DATE, DECIMAL,
-    
     VARIANT_BOOL,
     VT_ARRAY, 
-    VT_BSTR, 
+    //VT_BSTR, 
     VT_BOOL,
     VT_BYREF, 
     VT_CY,
@@ -34,11 +152,9 @@ use winapi::shared::wtypes::{
     VT_UI8,  
     VT_UINT, 
     VT_UNKNOWN, 
-    VT_VARIANT, 
-    
+    //VT_VARIANT, 
 };
 use winapi::shared::wtypesbase::{SCODE};
-
 use winapi::um::oaidl::{IDispatch,  __tagVARIANT, SAFEARRAY, VARIANT, VARIANT_n3, VARIANT_n1};
 use winapi::um::unknwnbase::IUnknown;
 
@@ -67,77 +183,17 @@ pub const VT_PUI4: u32 = VT_BYREF | VT_UI4;
 pub const VT_PINT: u32 = VT_BYREF | VT_INT;
 pub const VT_PUINT: u32 = VT_BYREF | VT_UINT;
 
-pub trait VariantType: Sized {
+pub trait VariantType: Sized { //Would like Clone + Default, but IDispatch and IUnknown don't implement them
     const VARTYPE: u32;
 
     fn into_variant(&mut self, n3: &mut VARIANT_n3, n1: &mut VARIANT_n1);
     fn from_variant(n3: &VARIANT_n3, n1: &VARIANT_n1) -> Result<Self, ()>;   
 }
 
-/// 
-/// Reference:
-///typedef struct tagVARIANT {
-///  union {
-///    struct {
-///      VARTYPE vt;
-///      WORD    wReserved1;
-///      WORD    wReserved2;
-///      WORD    wReserved3;
-///      union {
-///        LONGLONG     llVal;
-///        LONG         lVal;
-///        BYTE         bVal;
-///        SHORT        iVal;
-///        FLOAT        fltVal;
-///        DOUBLE       dblVal;
-///        VARIANT_BOOL boolVal;
-///        SCODE        scode;
-///        CY           cyVal;
-///        DATE         date;
-///        BSTR         bstrVal;
-///        IUnknown     *punkVal;
-///        IDispatch    *pdispVal;
-///        SAFEARRAY    *parray;
-///        BYTE         *pbVal;
-///        SHORT        *piVal;
-///        LONG         *plVal;
-///        LONGLONG     *pllVal;
-///        FLOAT        *pfltVal;
-///        DOUBLE       *pdblVal;
-///        VARIANT_BOOL *pboolVal;
-///        SCODE        *pscode;
-///        CY           *pcyVal;
-///        DATE         *pdate;
-///        BSTR         *pbstrVal;
-///        IUnknown     **ppunkVal;
-///        IDispatch    **ppdispVal;
-///        SAFEARRAY    **pparray;
-///        VARIANT      *pvarVal;
-///        PVOID        byref;
-///        CHAR         cVal;
-///        USHORT       uiVal;
-///        ULONG        ulVal;
-///        ULONGLONG    ullVal;
-///        INT          intVal;
-///        UINT         uintVal;
-///        DECIMAL      *pdecVal;
-///        CHAR         *pcVal;
-///        USHORT       *puiVal;
-///        ULONG        *pulVal;
-///        ULONGLONG    *pullVal;
-///        INT          *pintVal;
-///        UINT         *puintVal;
-///        struct {
-///          PVOID       pvRecord;
-///          IRecordInfo *pRecInfo;
-///        } __VARIANT_NAME_4;
-///      } __VARIANT_NAME_3;
-///    } __VARIANT_NAME_2;
-///    DECIMAL decVal;
-///  } __VARIANT_NAME_1;
-///} VARIANT;
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Variant<T: VariantType>(T);
 
+#[allow(dead_code)]
 impl<T: VariantType> Variant<T> {
     pub fn new(t: T) -> Variant<T> {
         Variant(t)
@@ -247,7 +303,6 @@ variant_impl!{
         into => {|slf: &mut i64| *slf}
     }
 }
-
 variant_impl!{
     impl Variant for i32 {
         VARTYPE = VT_I4;
@@ -256,7 +311,6 @@ variant_impl!{
         into => {|slf: &mut i32| *slf}
     }
 }
-
 variant_impl!{
     impl Variant for u8 {
         VARTYPE = VT_UI1;
@@ -265,7 +319,6 @@ variant_impl!{
         into => {|slf: &mut u8| *slf}
     }
 }
-
 variant_impl!{
     impl Variant for i16 {
         VARTYPE = VT_I2;
@@ -274,7 +327,6 @@ variant_impl!{
         into => {|slf: &mut i16| *slf}
     }
 }
-
 variant_impl!{
     impl Variant for f32 {
         VARTYPE = VT_R4;
@@ -283,7 +335,6 @@ variant_impl!{
         into => {|slf: &mut f32| *slf}
     }
 }
-
 variant_impl!{
     impl Variant for f64 {
         VARTYPE = VT_R8;
@@ -292,7 +343,6 @@ variant_impl!{
         into => {|slf: &mut f64| *slf}
     }
 }
-
 variant_impl!{
     impl Variant for bool {
         VARTYPE = VT_BOOL;
@@ -301,7 +351,6 @@ variant_impl!{
         into => {|slf: &mut bool| VARIANT_BOOL::from(*slf)}
     }
 }
-
 variant_impl!{
     impl Variant for SCode {
         VARTYPE = VT_ERROR;
@@ -310,8 +359,6 @@ variant_impl!{
         into => {|slf: &mut SCode| slf.0}
     }
 }
-
-
 variant_impl!{
     impl Variant for Currency {
         VARTYPE = VT_CY;
@@ -320,7 +367,6 @@ variant_impl!{
         into => {|slf: &mut Currency| CY::from(*slf)}
     }
 }
-
 variant_impl!{
     impl Variant for Date {
         VARTYPE = VT_DATE;
@@ -329,9 +375,7 @@ variant_impl!{
         into => {|slf: &mut Date| DATE::from(*slf)}
     }
 }
-
 //BSTR
-
 variant_impl!{
     impl Variant for Ptr<IUnknown> {
         VARTYPE = VT_UNKNOWN;
@@ -340,7 +384,6 @@ variant_impl!{
         into => {|slf: &mut Ptr<IUnknown>| (*slf).as_ptr()}
     }
 }
-
 variant_impl!{
     impl Variant for Ptr<IDispatch> {
         VARTYPE = VT_DISPATCH;
@@ -349,7 +392,6 @@ variant_impl!{
         into => {|slf: &mut Ptr<IDispatch>| (*slf).as_ptr()}
     }
 }
-
 variant_impl!{
     impl Variant for Box<u8> {
         VARTYPE = VT_PUI1;
@@ -358,7 +400,6 @@ variant_impl!{
         into => {|slf: &mut Box<u8>| Box::into_raw((*slf).clone())}
     }
 }
-
 variant_impl!{
     impl Variant for Box<i16> {
         VARTYPE = VT_PI2;
@@ -367,7 +408,6 @@ variant_impl!{
         into => {|slf: &mut Box<i16>| Box::into_raw((*slf).clone())}
     }
 }
-
 variant_impl!{
     impl Variant for Box<i32> {
         VARTYPE = VT_PI4;
@@ -376,7 +416,6 @@ variant_impl!{
         into => {|slf: &mut Box<i32>| Box::into_raw((*slf).clone())}
     }
 }
-
 variant_impl!{
     impl Variant for Box<i64> {
         VARTYPE = VT_PI8;
@@ -385,7 +424,6 @@ variant_impl!{
         into => {|slf: &mut Box<i64>| Box::into_raw((*slf).clone())}
     }
 }
-
 variant_impl!{
     impl Variant for Box<f32> {
         VARTYPE = VT_PR4;
@@ -394,7 +432,6 @@ variant_impl!{
         into => {|slf: &mut Box<f32>| Box::into_raw((*slf).clone())}
     }
 }
-
 variant_impl!{
     impl Variant for Box<f64> {
         VARTYPE = VT_PR8;
@@ -403,7 +440,6 @@ variant_impl!{
         into => {|slf: &mut Box<f64>| Box::into_raw((*slf).clone())}
     }
 }
-
 variant_impl!{
     impl Variant for Box<bool> {
         VARTYPE = VT_PBOOL;
@@ -419,7 +455,6 @@ variant_impl!{
         }
     }
 }
-
 variant_impl!{
     impl Variant for Box<SCode> {
         VARTYPE = VT_PERROR;
@@ -428,7 +463,6 @@ variant_impl!{
         into => {|slf: &mut Box<SCode>| Box::into_raw(Box::new((*slf).0))}
     }
 }
-
 variant_impl!{
     impl Variant for Box<Currency> {
         VARTYPE = VT_PCY;
@@ -442,7 +476,6 @@ variant_impl!{
         }
     }
 }
-
 variant_impl!{
     impl Variant for Box<Date> {
         VARTYPE = VT_PDATE;
@@ -456,8 +489,6 @@ variant_impl!{
         }
     }
 }
-
-
 variant_impl! {
     impl Variant for Box<Ptr<IUnknown>> {
         VARTYPE = VT_PUNKNOWN;
@@ -478,7 +509,6 @@ variant_impl! {
         }
     }
 }
-
 variant_impl! {
     impl Variant for Box<Ptr<IDispatch>> {
         VARTYPE = VT_PDISPATCH;
@@ -499,10 +529,8 @@ variant_impl! {
         }
     }
 }
-
 //how to handle nested variants? 
 //VT_VARIANT
-
 variant_impl!{
     impl<T: SafeArrayElement> Variant for SafeArray<T>{
         VARTYPE = VT_ARRAY;
@@ -529,7 +557,6 @@ variant_impl!{
         }
     }
 }
-
 variant_impl!{
     impl Variant for Ptr<c_void> {
         VARTYPE = VT_BYREF;
@@ -543,7 +570,6 @@ variant_impl!{
         into => {|slf: &mut Ptr<c_void>| slf.as_ptr()}
     }
 }
-
 variant_impl!{
     impl Variant for i8 {
         VARTYPE = VT_I1;
@@ -552,7 +578,6 @@ variant_impl!{
         into => {|slf: &mut i8| *slf}
     }
 }
-
 variant_impl!{
     impl Variant for u16 {
         VARTYPE = VT_UI2;
@@ -561,7 +586,6 @@ variant_impl!{
         into => {|slf: &mut u16| *slf}
     }
 }
-
 variant_impl!{
     impl Variant for u32 {
         VARTYPE = VT_UI4;
@@ -570,7 +594,6 @@ variant_impl!{
         into => {|slf: &mut u32| *slf}
     }
 }
-
 variant_impl!{
     impl Variant for u64 {
         VARTYPE = VT_UI8;
@@ -579,7 +602,6 @@ variant_impl!{
         into => {|slf: &mut u64| *slf}
     }
 }
-
 variant_impl!{
     impl Variant for Int {
         VARTYPE = VT_INT;
@@ -588,7 +610,6 @@ variant_impl!{
         into => {|slf: &mut Int| slf.0}
     }
 }
-
 variant_impl!{
     impl Variant for UInt {
         VARTYPE = VT_UINT;
@@ -597,7 +618,6 @@ variant_impl!{
         into => {|slf: &mut UInt| slf.0}
     }
 }
-
 variant_impl!{
     impl Variant for Box<DecWrapper> {
         VARTYPE = VT_PDECIMAL;
@@ -609,7 +629,6 @@ variant_impl!{
         }}
     }
 }
-
 variant_impl!{
     impl Variant for Box<Decimal> {
         VARTYPE = VT_PDECIMAL;
@@ -621,7 +640,6 @@ variant_impl!{
         }}
     }
 }
-
 variant_impl!{
     impl Variant for Box<i8> {
         VARTYPE = VT_PI1;
@@ -632,7 +650,6 @@ variant_impl!{
         }}
     }
 }
-
 variant_impl!{
     impl Variant for Box<u16> {
         VARTYPE = VT_PUI2;
@@ -643,7 +660,6 @@ variant_impl!{
         }}
     }
 }
-
 variant_impl!{
     impl Variant for Box<u32> {
         VARTYPE = VT_PUI4;
@@ -654,7 +670,6 @@ variant_impl!{
         }}
     }
 }
-
 variant_impl!{
     impl Variant for Box<u64> {
         VARTYPE = VT_PUI8;
@@ -665,7 +680,6 @@ variant_impl!{
         }}
     }
 }
-
 variant_impl!{
     impl Variant for Box<Int> {
         VARTYPE = VT_PINT;
@@ -674,7 +688,6 @@ variant_impl!{
         into => {|slf: &mut Box<Int>| Box::into_raw(Box::new((**slf).0))}
     }
 }
-
 variant_impl!{
     impl Variant for Box<UInt> {
         VARTYPE = VT_PUINT;
@@ -683,7 +696,6 @@ variant_impl!{
         into => {|slf: &mut Box<UInt>| Box::into_raw(Box::new((**slf).0))}
     }
 }
-
 variant_impl!{
     impl Variant for DecWrapper {
         VARTYPE = VT_DECIMAL;
@@ -694,7 +706,6 @@ variant_impl!{
         }}
     }
 }
-
 variant_impl!{
     impl Variant for Decimal {
         VARTYPE = VT_DECIMAL;
@@ -727,61 +738,16 @@ impl VariantType for VtNull {
     }
 }
 
-        /*
-        * VARENUM usage key,
-        *
-        * * [V] - may appear in a VARIANT
-        * * [T] - may appear in a TYPEDESC
-        * * [P] - may appear in an OLE property set
-        * * [S] - may appear in a Safe Array
-        *
-        *
-        *  VT_EMPTY            [V]   [P]     nothing
-        *  VT_NULL             [V]   [P]     SQL style Null
-        *  VT_I2               [V][T][P][S]  2 byte signed int
-        *  VT_I4               [V][T][P][S]  4 byte signed int
-        *  VT_R4               [V][T][P][S]  4 byte real
-        *  VT_R8               [V][T][P][S]  8 byte real
-        *  VT_CY               [V][T][P][S]  currency
-        *  VT_DATE             [V][T][P][S]  date
-        *  VT_BSTR             [V][T][P][S]  OLE Automation string
-        *  VT_DISPATCH         [V][T]   [S]  IDispatch *
-        *  VT_ERROR            [V][T][P][S]  SCODE
-        *  VT_BOOL             [V][T][P][S]  True=-1, False=0
-        *  VT_VARIANT          [V][T][P][S]  VARIANT *
-        *  VT_UNKNOWN          [V][T]   [S]  IUnknown *
-        *  VT_DECIMAL          [V][T]   [S]  16 byte fixed point
-        *  VT_RECORD           [V]   [P][S]  user defined type
-        *  VT_I1               [V][T][P][s]  signed char
-        *  VT_UI1              [V][T][P][S]  unsigned char
-        *  VT_UI2              [V][T][P][S]  unsigned short
-        *  VT_UI4              [V][T][P][S]  ULONG
-        *  VT_I8                  [T][P]     signed 64-bit int
-        *  VT_UI8                 [T][P]     unsigned 64-bit int
-        *  VT_INT              [V][T][P][S]  signed machine int
-        *  VT_UINT             [V][T]   [S]  unsigned machine int
-        *  VT_INT_PTR             [T]        signed machine register size width
-        *  VT_UINT_PTR            [T]        unsigned machine register size width
-        *  VT_VOID                [T]        C style void
-        *  VT_HRESULT             [T]        Standard return type
-        *  VT_PTR                 [T]        pointer type
-        *  VT_SAFEARRAY           [T]        (use VT_ARRAY in VARIANT)
-        *  VT_CARRAY              [T]        C style array
-        *  VT_USERDEFINED         [T]        user defined type
-        *  VT_LPSTR               [T][P]     null terminated string
-        *  VT_LPWSTR              [T][P]     wide null terminated string
-        *  VT_FILETIME               [P]     FILETIME
-        *  VT_BLOB                   [P]     Length prefixed bytes
-        *  VT_STREAM                 [P]     Name of the stream follows
-        *  VT_STORAGE                [P]     Name of the storage follows
-        *  VT_STREAMED_OBJECT        [P]     Stream contains an object
-        *  VT_STORED_OBJECT          [P]     Storage contains an object
-        *  VT_VERSIONED_STREAM       [P]     Stream with a GUID version
-        *  VT_BLOB_OBJECT            [P]     Blob contains an object 
-        *  VT_CF                     [P]     Clipboard format
-        *  VT_CLSID                  [P]     A Class ID
-        *  VT_VECTOR                 [P]     simple counted array
-        *  VT_ARRAY            [V]           SAFEARRAY*
-        *  VT_BYREF            [V]           void* for local use
-        *  VT_BSTR_BLOB                      Reserved for system use
-        */
+#[cfg(test)]
+mod test {
+    use super::*;
+    
+    #[test]
+    fn test_variant() {
+        let value = 100u8;
+        let r = Variant::<u8>::to_variant(&mut Variant::new(value)).unwrap(); 
+        let new_v = Variant::<u8>::from_variant(r).unwrap();
+        println!("{:?}", new_v);
+        assert_eq!(new_v, Variant::new(100u8) );
+    }
+}

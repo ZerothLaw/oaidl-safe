@@ -49,6 +49,10 @@ impl From<Date> for DATE {
 pub struct DecWrapper(Decimal);
 
 impl DecWrapper {
+    pub fn new(dec: Decimal) -> DecWrapper {
+        DecWrapper(dec)
+    }
+
     pub fn unwrap(self) -> Decimal {
         self.0
     }
@@ -84,7 +88,7 @@ impl From<Decimal> for DecWrapper {
     }
 }
 
-pub fn build_c_decimal(dec: Decimal) -> DECIMAL {
+fn build_c_decimal(dec: Decimal) -> DECIMAL {
     let scale = dec.scale() as u8;
     let sign = if dec.is_sign_positive() {0} else {DECIMAL_NEG};
     let serial = dec.serialize();
@@ -109,7 +113,7 @@ pub fn build_c_decimal(dec: Decimal) -> DECIMAL {
     }
 }
 
-pub fn build_rust_decimal(dec: DECIMAL) -> Decimal {
+fn build_rust_decimal(dec: DECIMAL) -> Decimal {
     let sign = if dec.sign == DECIMAL_NEG {true} else {false};
     Decimal::from_parts((dec.Lo64 & 0xFFFFFFFF) as u32, 
                         ((dec.Lo64 >> 32) & 0xFFFFFFFF) as u32, 
@@ -117,6 +121,7 @@ pub fn build_rust_decimal(dec: DECIMAL) -> Decimal {
                         sign,
                         dec.scale as u32 ) 
 }
+
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct VariantBool(bool);
 

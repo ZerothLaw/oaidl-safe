@@ -6,11 +6,10 @@ pub struct Ptr<T> {
     inner: NonNull<T>
 }
 
+#[allow(dead_code)]
 impl<T> Ptr<T> {
     pub fn new(p: NonNull<T>) -> Ptr<T> {
-        Ptr {
-            inner: p
-        }
+        Ptr { inner: p }
     }
 
     pub fn with_checked(p: *mut T) -> Option<Ptr<T>> {
