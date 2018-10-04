@@ -10,7 +10,7 @@ use rust_decimal::Decimal;
 
 use winapi::shared::wtypes::{CY, DATE, DECIMAL, DECIMAL_NEG, VARIANT_BOOL};
 
-#[derive(Debug, Clone, Copy, Hash, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq,  Hash, PartialOrd, PartialEq)]
 pub struct Currency(pub i64);
 
 impl From<i64> for Currency {
@@ -45,7 +45,7 @@ impl From<Date> for DATE {
         d.0
     }
 }
-
+#[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DecWrapper(Decimal);
 
 impl DecWrapper {
@@ -117,7 +117,7 @@ pub fn build_rust_decimal(dec: DECIMAL) -> Decimal {
                         sign,
                         dec.scale as u32 ) 
 }
-
+#[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct VariantBool(bool);
 
 impl From<VariantBool> for VARIANT_BOOL {
@@ -143,9 +143,11 @@ impl From<VariantBool> for bool {
         b.0
     }
 }
-
+#[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Int(pub i32);
+#[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct UInt(pub u32);
+#[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SCode(pub i32);
 
 #[cfg(test)]
