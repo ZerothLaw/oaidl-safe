@@ -5,4 +5,4 @@ authors = ["ZerothLaw <trinioler@gmail.com>"]
 
 [dependencies]
 rust_decimal = "0.10.1"
-winapi = {version = "0.3.6", features = ["oaidl", "wtypes"]}
+winapi = {version = "0.3.6", features = ["oaidl", "oleauto", "wtypes"]}
