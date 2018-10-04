@@ -152,7 +152,7 @@ use winapi::shared::wtypes::{
     VT_UI8,  
     VT_UINT, 
     VT_UNKNOWN, 
-    //VT_VARIANT, 
+    VT_VARIANT, 
 };
 use winapi::shared::wtypesbase::{SCODE};
 use winapi::um::oaidl::{IDispatch,  __tagVARIANT, SAFEARRAY, VARIANT, VARIANT_n3, VARIANT_n1};
@@ -186,8 +186,8 @@ pub const VT_PUINT: u32 = VT_BYREF | VT_UINT;
 pub trait VariantType: Sized { //Would like Clone + Default, but IDispatch and IUnknown don't implement them
     const VARTYPE: u32;
 
-    fn into_variant(&mut self, n3: &mut VARIANT_n3, n1: &mut VARIANT_n1);
-    fn from_variant(n3: &VARIANT_n3, n1: &VARIANT_n1) -> Result<Self, ()>;   
+    fn from_variant(var: Ptr<VARIANT>) -> Result<Self, ()>;  
+    fn into_variant(&mut self) -> Result<Ptr<VARIANT>, ()>;
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -203,41 +203,21 @@ impl<T: VariantType> Variant<T> {
         self.0
     }
 
-    pub fn to_variant(&mut self) -> Result<VARIANT, ()> {
-        let mut n3: VARIANT_n3 = unsafe {mem::zeroed()};
-        let mut n1: VARIANT_n1 = unsafe {mem::zeroed()};
-        self.0.into_variant(&mut n3, &mut n1);
-        let tv = __tagVARIANT { vt: T::VARTYPE as u16, 
-                                wReserved1: 0, 
-                                wReserved2: 0, 
-                                wReserved3: 0, 
-                                n3: n3};
-        unsafe {
-            let n_ptr = n1.n2_mut();
-            *n_ptr = tv;
-        };
-        Ok(VARIANT {n1: n1})
+    pub fn borrow(&self) -> &T {
+        &self.0
     }
 
-    pub fn from_variant(var: VARIANT) -> Result<Variant<T>, ()> {
-        let mut n1 = var.n1;
+    pub fn borrow_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
 
-        let n3 = unsafe {
-            n1.n2_mut().n3
-        };
-        let t: T = T::from_variant(&n3, &n1).unwrap();
+    pub fn to_variant(&mut self) -> Result<Ptr<VARIANT>, ()> {
+        self.0.into_variant()        
+    }
+
+    pub fn from_variant(var: Ptr<VARIANT>) -> Result<Variant<T>, ()> {
+        let t = T::from_variant(var).unwrap();
         Ok(Variant(t))
-    }
-}
-
-impl VariantType for () {
-    const VARTYPE: u32 = VT_EMPTY;
-    fn into_variant(&mut self, _n3: &mut VARIANT_n3, _n1: &mut VARIANT_n1) {
-
-    }
-
-    fn from_variant(_n3: &VARIANT_n3, _n1: &VARIANT_n1) -> Result<Self, ()>{
-        Ok(())
     }
 }
 
@@ -252,18 +232,37 @@ macro_rules! variant_impl {
     ) => {
         impl $(<$tn: $tc>)* VariantType for $t {
             const VARTYPE: u32 = $vt;
-            fn from_variant(n3: &VARIANT_n3, _n1: &VARIANT_n1) -> Result<Self, ()>{
+            fn from_variant(var: Ptr<VARIANT>) -> Result<Self, ()>{
+                let var = unsafe {*var.as_ptr()};
+                let mut n1 = var.n1;
+
+                let n3 = unsafe {
+                    n1.n2_mut().n3
+                };
                 unsafe {
                     let n_ptr = n3.$un_n();
                     $from(n_ptr)
                 }
             }
 
-            fn into_variant(&mut self, n3: &mut VARIANT_n3, _n1: &mut VARIANT_n1) {
+            fn into_variant(&mut self) -> Result<Ptr<VARIANT>, ()> {
+                let mut n3: VARIANT_n3 = unsafe {mem::zeroed()};
+                let mut n1: VARIANT_n1 = unsafe {mem::zeroed()};
                 unsafe {
                     let n_ptr = n3.$un_n_mut();
                     *n_ptr = $into(self)
                 }
+                let tv = __tagVARIANT { vt: <Self as VariantType>::VARTYPE as u16, 
+                                wReserved1: 0, 
+                                wReserved2: 0, 
+                                wReserved3: 0, 
+                                n3: n3};
+                unsafe {
+                    let n_ptr = n1.n2_mut();
+                    *n_ptr = tv;
+                };
+                let var = Box::new(VARIANT{ n1: n1 });
+                Ok(Ptr::with_checked(Box::into_raw(var)).unwrap())
             }
         }
     };
@@ -278,18 +277,33 @@ macro_rules! variant_impl {
     ) => {
         impl $(<$tn: $tc>)* VariantType for $t {
             const VARTYPE: u32 = $vt;
-            fn from_variant(_n3: &VARIANT_n3, n1: &VARIANT_n1) -> Result<Self, ()>{
+            fn from_variant(var: Ptr<VARIANT>) -> Result<Self, ()>{
+                let var = unsafe {*var.as_ptr()};
+                let n1 = var.n1;
                 unsafe {
                     let n_ptr = n1.$un_n();
                     $from(n_ptr)
                 }
             }
 
-            fn into_variant(&mut self, _n3: &mut VARIANT_n3, n1: &mut VARIANT_n1) {
+           fn into_variant(&mut self) -> Result<Ptr<VARIANT>, ()> {
+                let n3: VARIANT_n3 = unsafe {mem::zeroed()};
+                let mut n1: VARIANT_n1 = unsafe {mem::zeroed()};
                 unsafe {
                     let n_ptr = n1.$un_n_mut();
                     *n_ptr = $into(self)
                 }
+                let tv = __tagVARIANT { vt: <Self as VariantType>::VARTYPE as u16, 
+                                wReserved1: 0, 
+                                wReserved2: 0, 
+                                wReserved3: 0, 
+                                n3: n3};
+                unsafe {
+                    let n_ptr = n1.n2_mut();
+                    *n_ptr = tv;
+                };
+                let var = Box::new(VARIANT{ n1: n1 });
+                Ok(Ptr::with_checked(Box::into_raw(var)).unwrap())
             }
         }
     };
@@ -529,8 +543,23 @@ variant_impl! {
         }
     }
 }
-//how to handle nested variants? 
-//VT_VARIANT
+variant_impl!{
+    impl<T: VariantType> Variant for Variant<T> {
+        VARTYPE = VT_VARIANT;
+        n3, pvarVal, pvarVal_mut
+        from => {|n_ptr: &*mut VARIANT| {
+            let pnn = match NonNull::new(*n_ptr) {
+                Some(nn) => Ptr::new(nn), 
+                None => return Err(()) 
+            };
+            Variant::<T>::from_variant(pnn)
+        }}
+        into => {|slf: &mut Variant<T>| {
+            let pvar = slf.borrow_mut().into_variant().unwrap();
+            pvar.as_ptr()
+        }}
+    }
+}
 variant_impl!{
     impl<T: SafeArrayElement> Variant for SafeArray<T>{
         VARTYPE = VT_ARRAY;
@@ -720,20 +749,21 @@ pub struct VtNull{}
 
 impl VariantType for VtEmpty {
     const VARTYPE: u32 = VT_EMPTY;
-    fn into_variant(&mut self, _n3: &mut VARIANT_n3, _n1: &mut VARIANT_n1) {
-
+    fn into_variant(&mut self) -> Result<Ptr<VARIANT>, ()> {
+        //TODO: fix this
+        Err(())
     }
-    fn from_variant(_n3: &VARIANT_n3, _n1: &VARIANT_n1) -> Result<Self, ()> {
+    fn from_variant(_var: Ptr<VARIANT>) -> Result<Self, ()> {
         Ok(VtEmpty{})
     }
 }
 
 impl VariantType for VtNull {
     const VARTYPE: u32 = VT_NULL;
-    fn into_variant(&mut self, _n3: &mut VARIANT_n3, _n1: &mut VARIANT_n1) {
-
+    fn into_variant(&mut self) -> Result<Ptr<VARIANT>, ()> {
+        Err(())
     }
-    fn from_variant(_n3: &VARIANT_n3, _n1: &VARIANT_n1) -> Result<Self, ()> {
+    fn from_variant(_var: Ptr<VARIANT>) -> Result<Self, ()> {
         Ok(VtNull{})
     }
 }
@@ -744,10 +774,10 @@ mod test {
     
     #[test]
     fn test_variant() {
-        let value = 100u8;
-        let r = Variant::<u8>::to_variant(&mut Variant::new(value)).unwrap(); 
-        let new_v = Variant::<u8>::from_variant(r).unwrap();
+        let mut value = 100u8;
+        let r = value.into_variant().unwrap();
+        let new_v = u8::from_variant(r).unwrap();
         println!("{:?}", new_v);
-        assert_eq!(new_v, Variant::new(100u8) );
+        assert_eq!(new_v, 100u8 );
     }
 }

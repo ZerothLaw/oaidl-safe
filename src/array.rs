@@ -1,4 +1,4 @@
-use std::ptr::null_mut;
+use std::ptr::{NonNull, null_mut};
 use rust_decimal::Decimal;
 
 use winapi::ctypes::{c_long, c_void};
@@ -278,7 +278,12 @@ safe_arr_impl!{impl <T: VariantType> SafeArrayElement for Variant<T> {
     from => {|psa, ix| {
         let mut pvar: *mut VARIANT = null_mut();
         let hr = SafeArrayGetElement(psa, &ix, &mut pvar as *mut _ as *mut c_void);
-        match Variant::<T>::from_variant(*pvar) {
+        let nn = match NonNull::new(pvar) {
+            Some(nn) => nn, 
+            None => panic!("Did not get a valid variant pointer")
+        };
+        let pnn = Ptr::new(nn);
+        match Variant::<T>::from_variant(pnn) {
             Ok(var) => (hr, var), 
             Err(_) => panic!("Invalid variant pointer")
         }
