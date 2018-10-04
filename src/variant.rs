@@ -118,370 +118,471 @@ impl VariantType for () {
     }
 }
 
-macro_rules! impl_variant {
-    (for($tb:ident : $tc:ident) $t:ty => $vt:expr, from: {$from:expr} <=> into: {$into:expr}) => {
-        impl<$tb: $tc> VariantType for $t {
+macro_rules! variant_impl {
+    (
+        impl $(<$tn:ident : $tc:ident>)* Variant for $t:ty {
+            VARTYPE = $vt:expr;
+            n3, $un_n:ident, $un_n_mut:ident
+            from => {$from:expr}
+            into => {$into:expr}
+        }
+    ) => {
+        impl $(<$tn: $tc>)* VariantType for $t {
             const VARTYPE: u32 = $vt;
-            
-            fn from_variant(n3: &VARIANT_n3, n1: &VARIANT_n1) -> Result<Self, ()>{
-                unsafe {$from(n3, n1)}
+            fn from_variant(n3: &VARIANT_n3, _n1: &VARIANT_n1) -> Result<Self, ()>{
+                unsafe {
+                    let n_ptr = n3.$un_n();
+                    $from(n_ptr)
+                }
             }
 
-            fn into_variant(self, n3: &mut VARIANT_n3, n1: &mut VARIANT_n1) {
-                unsafe {$into(self, n3, n1)}
+            fn into_variant(self, n3: &mut VARIANT_n3, _n1: &mut VARIANT_n1) {
+                unsafe {
+                    let n_ptr = n3.$un_n_mut();
+                    *n_ptr = $into(self)
+                }
             }
         }
-        
     };
-    (for $t:ty => $vt:expr, from: {$from:expr} <=> into: {$into:expr}) => {
-        impl VariantType for $t {
+
+    (
+        impl $(<$tn:ident : $tc:ident>)* Variant for $t:ty {
+            VARTYPE = $vt:expr;
+            n1, $un_n:ident, $un_n_mut:ident
+            from => {$from:expr}
+            into => {$into:expr}
+        }
+    ) => {
+        impl $(<$tn: $tc>)* VariantType for $t {
             const VARTYPE: u32 = $vt;
-            
             fn from_variant(n3: &VARIANT_n3, n1: &VARIANT_n1) -> Result<Self, ()>{
-                unsafe {$from(n3, n1)}
+                unsafe {
+                    let n_ptr = n1.$un_n();
+                    $from(n_ptr)
+                }
             }
 
             fn into_variant(self, n3: &mut VARIANT_n3, n1: &mut VARIANT_n1) {
-                unsafe {$into(self, n3, n1)}
+                unsafe {
+                    let n_ptr = n1.$un_n_mut();
+                    *n_ptr = $into(self)
+                }
             }
-        }  
+        }
     };
 }
 
-impl_variant!(for i64 => VT_I8, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.llVal();
-            Ok(*n_ptr)
-        }
-    } <=> into: {
-        |slf, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.llVal_mut();
-            *n_ptr = slf;
-        }
+variant_impl!{
+    impl Variant for i64 {
+        VARTYPE = VT_I8;
+        n3, llVal, llVal_mut
+        from => {|n_ptr: &i64| {Ok(*n_ptr)}}
+        into => {|slf| slf}
     }
-);
+}
 
-impl_variant!(for i32 => VT_I4, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.lVal();
-            Ok(*n_ptr)
-        }
-    } <=> into: {
-        |slf, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.lVal_mut();
-            *n_ptr = slf;
-        }
+variant_impl!{
+    impl Variant for i32 {
+        VARTYPE = VT_I4;
+        n3, lVal, lVal_mut
+        from => {|n_ptr: &i32| Ok(*n_ptr)}
+        into => {|slf: i32| slf}
     }
-);
+}
 
-impl_variant!(for u8 => VT_UI1, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.bVal();
-            Ok(*n_ptr)
-        }
-    } <=> into: {
-        |slf, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.bVal_mut();
-            *n_ptr = slf;
-        }
+variant_impl!{
+    impl Variant for u8 {
+        VARTYPE = VT_UI1;
+        n3, bVal, bVal_mut
+        from => {|n_ptr: &u8| Ok(*n_ptr)}
+        into => {|slf: u8| slf}
     }
-);
+}
 
-impl_variant!(for i16 => VT_I2, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.iVal();
-            Ok(*n_ptr)
-        }
-    } <=> into: {
-        |slf, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.iVal_mut();
-            *n_ptr = slf;
-        }
+variant_impl!{
+    impl Variant for i16 {
+        VARTYPE = VT_I2;
+        n3, iVal, iVal_mut
+        from => {|n_ptr: &i16| Ok(*n_ptr)}
+        into => {|slf: i16| slf}
     }
-);
+}
 
-
-impl_variant!(for f32 => VT_R4, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.fltVal();
-            Ok(*n_ptr)
-        }
-    } <=> into: {
-        |slf, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.fltVal_mut();
-            *n_ptr = slf;
-        }
+variant_impl!{
+    impl Variant for f32 {
+        VARTYPE = VT_R4;
+        n3, fltVal, fltVal_mut
+        from => {|n_ptr: &f32| Ok(*n_ptr)}
+        into => {|slf: f32| slf}
     }
-);
+}
 
-impl_variant!(for f64 => VT_R8, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.dblVal();
-            Ok(*n_ptr)
-        }
-    } <=> into: {
-        |slf, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.dblVal_mut();
-            *n_ptr = slf;
-        }
+variant_impl!{
+    impl Variant for f64 {
+        VARTYPE = VT_R8;
+        n3, dblVal, dblVal_mut
+        from => {|n_ptr: &f64| Ok(*n_ptr)}
+        into => {|slf: f64| slf}
     }
-);
+}
 
-impl_variant!(for bool => VT_BOOL, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.boolVal();
-            Ok(bool::from(VariantBool::from(*n_ptr as VARIANT_BOOL)))
-        }
-    } <=> into: {
-        |slf, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.boolVal_mut();
-            *n_ptr = VARIANT_BOOL::from(slf);
-        }
+variant_impl!{
+    impl Variant for bool {
+        VARTYPE = VT_BOOL;
+        n3, boolVal, boolVal_mut
+        from => {|n_ptr: &VARIANT_BOOL| Ok(bool::from(VariantBool::from(*n_ptr)))}
+        into => {|slf: bool| VARIANT_BOOL::from(slf)}
     }
-);
+}
 
-impl_variant!(for Currency => VT_CY, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.cyVal();
-            Ok(Currency::from(*n_ptr))
-        }
-    } <=> into: {
-        |slf, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.cyVal_mut();
-            *n_ptr = CY::from(slf);
-        }
+variant_impl!{
+    impl Variant for Currency {
+        VARTYPE = VT_CY;
+        n3, cyVal, cyVal_mut
+        from => {|n_ptr: &CY| Ok(Currency::from(*n_ptr))}
+        into => {|slf: Currency| CY::from(slf)}
     }
-);
+}
 
-impl_variant!(for Date => VT_DATE, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.date();
-            Ok(Date::from(*n_ptr))
-        }
-    } <=> into: {
-        |slf, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.date_mut();
-            *n_ptr = DATE::from(slf)
-        }
+variant_impl!{
+    impl Variant for Date {
+        VARTYPE = VT_DATE;
+        n3, date, date_mut
+        from => {|n_ptr: &DATE| Ok(Date::from(*n_ptr))}
+        into => {|slf: Date| DATE::from(slf)}
     }
-);
+}
 
-impl_variant!(for Ptr<IUnknown> => VT_UNKNOWN, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.punkVal();
-            Ok(Ptr::with_checked(*n_ptr).unwrap())
-        }
-    } <=> into: {
-        |slf: Ptr<IUnknown>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.punkVal_mut();
-            *n_ptr = slf.as_ptr();
-        }
+variant_impl!{
+    impl Variant for Ptr<IUnknown> {
+        VARTYPE = VT_UNKNOWN;
+        n3, punkVal, punkVal_mut
+        from => {|n_ptr: &* mut IUnknown| Ok(Ptr::with_checked(*n_ptr).unwrap())}
+        into => {|slf: Ptr<IUnknown>| slf.as_ptr()}
     }
-);
+}
 
-impl_variant!(for Ptr<IDispatch> => VT_DISPATCH, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.pdispVal();
-            Ok(Ptr::with_checked(*n_ptr).unwrap())
-        }
-    } <=> into: {
-        |slf: Ptr<IDispatch>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.pdispVal_mut();
-            *n_ptr = slf.as_ptr();
-        }
+variant_impl!{
+    impl Variant for Ptr<IDispatch> {
+        VARTYPE = VT_DISPATCH;
+        n3, pdispVal, pdispVal_mut
+        from => {|n_ptr: &* mut IDispatch| Ok(Ptr::with_checked(*n_ptr).unwrap())}
+        into => {|slf: Ptr<IDispatch>| slf.as_ptr()}
     }
-);
+}
 
-impl_variant!(for Box<u8> => VT_PUI1, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.pbVal();
-            Ok(Box::new(**n_ptr))
-        }
-    } <=> into: {
-        |slf: Box<u8>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.pbVal_mut();
-            *n_ptr = Box::into_raw(slf);
-        }
+variant_impl!{
+    impl Variant for Box<u8> {
+        VARTYPE = VT_PUI1;
+        n3, pbVal, pbVal_mut
+        from => {|n_ptr: &* mut u8| Ok(Box::new(**n_ptr))}
+        into => {|slf| Box::into_raw(slf)}
     }
-);
+}
 
-impl_variant!(for Box<i16> => VT_PI2, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.piVal();
-            Ok(Box::new(**n_ptr))
-        }
-    } <=> into: {
-        |slf: Box<i16>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.piVal_mut();
-            *n_ptr = Box::into_raw(slf);
-        }
+variant_impl!{
+    impl Variant for Box<i16> {
+        VARTYPE = VT_PI2;
+        n3, piVal, piVal_mut
+        from => {|n_ptr: &* mut i16| Ok(Box::new(**n_ptr))}
+        into => {|slf| Box::into_raw(slf)}
     }
-);
+}
 
-impl_variant!(for Box<i32> => VT_PI4, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.plVal();
-            Ok(Box::new(**n_ptr))
-        }
-    } <=> into: {
-        |slf: Box<i32>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.plVal_mut();
-            *n_ptr = Box::into_raw(slf);
-        }
+variant_impl!{
+    impl Variant for Box<i32> {
+        VARTYPE = VT_PI4;
+        n3, plVal, plVal_mut
+        from => {|n_ptr: &* mut i32| Ok(Box::new(**n_ptr))}
+        into => {|slf| Box::into_raw(slf)}
     }
-);
+}
 
-impl_variant!(for Box<i64> => VT_PI8, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.pllVal();
-            Ok(Box::new(**n_ptr))
-        }
-    } <=> into: {
-        |slf: Box<i64>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.pllVal_mut();
-            *n_ptr = Box::into_raw(slf);
-        }
+variant_impl!{
+    impl Variant for Box<i64> {
+        VARTYPE = VT_PI8;
+        n3, pllVal, pllVal_mut
+        from => {|n_ptr: &* mut i64| Ok(Box::new(**n_ptr))}
+        into => {|slf| Box::into_raw(slf)}
     }
-);
+}
 
-impl_variant!(for Box<f32> => VT_PR4, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.pfltVal();
-            Ok(Box::new(**n_ptr))
-        }
-    } <=> into: {
-        |slf: Box<f32>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.pfltVal_mut();
-            *n_ptr = Box::into_raw(slf);
-        }
+variant_impl!{
+    impl Variant for Box<f32> {
+        VARTYPE = VT_PR4;
+        n3, pfltVal, pfltVal_mut
+        from => {|n_ptr: &* mut f32| Ok(Box::new(**n_ptr))}
+        into => {|slf| Box::into_raw(slf)}
     }
-);
+}
 
-impl_variant!(for Box<f64> => VT_PR8, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.pdblVal();
-            Ok(Box::new(**n_ptr))
-        }
-    } <=> into: {
-        |slf: Box<f64>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.pdblVal_mut();
-            *n_ptr = Box::into_raw(slf);
-        }
+variant_impl!{
+    impl Variant for Box<f64> {
+        VARTYPE = VT_PR8;
+        n3, pdblVal, pdblVal_mut
+        from => {|n_ptr: &* mut f64| Ok(Box::new(**n_ptr))}
+        into => {|slf| Box::into_raw(slf)}
     }
-);
+}
 
-impl_variant!(for Box<bool> => VT_PBOOL, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.pboolVal();
-            Ok(Box::new(bool::from(VariantBool::from(**n_ptr))))
+variant_impl!{
+    impl Variant for Box<bool> {
+        VARTYPE = VT_PBOOL;
+        n3, pboolVal, pboolVal_mut
+        from => {
+            |n_ptr: &*mut VARIANT_BOOL| Ok(Box::new(bool::from(VariantBool::from(**n_ptr))))
         }
-    } <=> into: {
-        |slf: Box<bool>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.pboolVal_mut();
-            let bptr = Box::new(VARIANT_BOOL::from(*slf));
-            *n_ptr = Box::into_raw(bptr);
-        }
-    }
-);
-
-impl_variant!(for Box<Currency> => VT_PCY, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.pcyVal();
-            Ok(Box::new(Currency::from(**n_ptr)))
-        }
-    } <=> into: {
-        |slf: Box<Currency>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.pcyVal_mut();
-            let bptr = Box::new(CY::from(*slf));
-            *n_ptr = Box::into_raw(bptr);
-        }
-    }
-);
-
-impl_variant!(for Box<Date> => VT_PCY, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.pdate();
-            Ok(Box::new(Date(**n_ptr)))
-        }
-    } <=> into: {
-        |slf: Box<Date>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.pdate_mut();
-            let bptr = Box::new(DATE::from(*slf));
-            *n_ptr = Box::into_raw(bptr);
-        }
-    }
-);
-
-impl_variant!(for Box<Ptr<IUnknown>> => VT_PUNKNOWN, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.ppunkVal();
-            match NonNull::new((**n_ptr).clone()) {
-                Some(nn) => Ok(Box::new(Ptr::new(nn))), 
-                None => Err(())
+        into => {
+            |slf:Box<bool>| {
+                let bptr = Box::new(VARIANT_BOOL::from(*slf));
+                Box::into_raw(bptr)
             }
         }
-    } <=> into: {
-        |slf: Box<Ptr<IUnknown>>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.ppunkVal_mut();
-            let bptr = Box::new((*slf).as_ptr());
-            *n_ptr = Box::into_raw(bptr);
-        }
     }
-);
+}
 
-impl_variant!(for Box<Ptr<IDispatch>> => VT_PUNKNOWN, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.ppdispVal();
-            match NonNull::new((**n_ptr).clone()) {
-                Some(nn) => Ok(Box::new(Ptr::new(nn))), 
-                None => Err(())
+variant_impl!{
+    impl Variant for Box<Currency> {
+        VARTYPE = VT_PCY;
+        n3, pcyVal, pcyVal_mut
+        from => { |n_ptr: &*mut CY| Ok(Box::new(Currency::from(**n_ptr))) }
+        into => {
+            |slf:Box<Currency>| {
+                let bptr = Box::new(CY::from(*slf));
+                Box::into_raw(bptr)
             }
         }
-    } <=> into: {
-        |slf: Box<Ptr<IDispatch>>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.ppdispVal_mut();
-            let bptr = Box::new((*slf).as_ptr());
-            *n_ptr = Box::into_raw(bptr);
-        }
     }
-);
+}
 
-impl_variant!(for(T : VariantType) Variant2<T> => VT_VARIANT, 
-    from: {
-        |n3: &VARIANT_n3, _n1| {
-            let n_ptr = n3.pvarVal();
-            Variant2::<T>::from_variant(**n_ptr)
-        }
-    } <=> into: {
-        |slf: Variant2<T>, n3: &mut VARIANT_n3, _n1| {
-            let n_ptr = n3.pvarVal_mut();
-            let bptr = Box::new(slf.into_variant().unwrap());
-            *n_ptr = Box::into_raw(bptr);
+variant_impl!{
+    impl Variant for Box<Date> {
+        VARTYPE = VT_PDATE;
+        n3, pdate, pdate_mut
+        from => { |n_ptr: &*mut f64| Ok(Box::new(Date(**n_ptr))) }
+        into => {
+            |slf:Box<Date>| {
+                let bptr = Box::new(DATE::from(*slf));
+                Box::into_raw(bptr)
+            }
         }
     }
-);
+}
+
+
+variant_impl! {
+    impl Variant for Box<Ptr<IUnknown>> {
+        VARTYPE = VT_PUNKNOWN;
+        n3, ppunkVal, ppunkVal_mut
+        from => {
+            |n_ptr: &*mut *mut IUnknown| {
+                match NonNull::new((**n_ptr).clone()) {
+                    Some(nn) => Ok(Box::new(Ptr::new(nn))), 
+                    None => Err(())
+                }
+            }
+        }
+        into => {
+            |slf: Box<Ptr<IUnknown>>| {
+                let bptr = Box::new((*slf).as_ptr());
+                Box::into_raw(bptr)
+            }
+        }
+    }
+}
+
+variant_impl! {
+    impl Variant for Box<Ptr<IDispatch>> {
+        VARTYPE = VT_PDISPATCH;
+        n3, ppdispVal, ppdispVal_mut
+        from => {
+            |n_ptr: &*mut *mut IDispatch| {
+                match NonNull::new((**n_ptr).clone()) {
+                    Some(nn) => Ok(Box::new(Ptr::new(nn))), 
+                    None => Err(())
+                }
+            }
+        }
+        into => {
+            |slf: Box<Ptr<IDispatch>>| {
+                let bptr = Box::new((*slf).as_ptr());
+                Box::into_raw(bptr)
+            }
+        }
+    }
+}
+
+variant_impl!{
+    impl<T: VariantType> Variant for Variant2<T> {
+        VARTYPE = VT_VARIANT;
+        n3, pvarVal, pvarVal_mut
+        from => {
+            |n_ptr: &*mut VARIANT| {
+                Variant2::<T>::from_variant(**n_ptr)
+            }
+        }
+        into => {
+            |slf: Variant2<T>| {
+                let bptr = Box::new(slf.into_variant().unwrap());
+                Box::into_raw(bptr)
+            }
+        }
+    }
+}
+
+variant_impl!{
+    impl Variant for Ptr<c_void> {
+        VARTYPE = VT_BYREF;
+        n3, byref, byref_mut
+        from => {|n_ptr: &*mut c_void| {
+            match NonNull::new(*n_ptr) {
+                Some(nn) => Ok(Ptr::new(nn)), 
+                None => Err(())
+            }
+        }}
+        into => {|slf: Ptr<c_void>| slf.as_ptr()}
+    }
+}
+
+variant_impl!{
+    impl Variant for i8 {
+        VARTYPE = VT_I1;
+        n3, cVal, cVal_mut
+        from => {|n_ptr: &i8|Ok(*n_ptr)}
+        into => {|slf| slf}
+    }
+}
+
+variant_impl!{
+    impl Variant for u16 {
+        VARTYPE = VT_UI2;
+        n3, uiVal, uiVal_mut
+        from => {|n_ptr: &u16|Ok(*n_ptr)}
+        into => {|slf| slf}
+    }
+}
+
+variant_impl!{
+    impl Variant for u32 {
+        VARTYPE = VT_UI4;
+        n3, ulVal, ulVal_mut
+        from => {|n_ptr: &u32|Ok(*n_ptr)}
+        into => {|slf| slf}
+    }
+}
+
+variant_impl!{
+    impl Variant for u64 {
+        VARTYPE = VT_UI8;
+        n3, ullVal, ullVal_mut
+        from => {|n_ptr: &u64|Ok(*n_ptr)}
+        into => {|slf| slf}
+    }
+}
+
+variant_impl!{
+    impl Variant for Int {
+        VARTYPE = VT_INT;
+        n3, intVal, intVal_mut
+        from => {|n_ptr: &i32| Ok(Int(*n_ptr))}
+        into => {|slf: Int| slf.0}
+    }
+}
+
+variant_impl!{
+    impl Variant for UInt {
+        VARTYPE = VT_UINT;
+        n3, uintVal, uintVal_mut
+        from => {|n_ptr: &u32| Ok(UInt(*n_ptr))}
+        into => {|slf: UInt| slf.0}
+    }
+}
+
+variant_impl!{
+    impl Variant for Box<DecWrapper> {
+        VARTYPE = VT_PDECIMAL;
+        n3, pdecVal, pdecVal_mut
+        from => {|n_ptr: &*mut DECIMAL|Ok(Box::new(DecWrapper::from(**n_ptr)))}
+        into => {|slf: Box<DecWrapper>| {
+            let bptr = Box::new(DECIMAL::from(*slf));
+            Box::into_raw(bptr)
+        }}
+    }
+}
+
+variant_impl!{
+    impl Variant for Box<i8> {
+        VARTYPE = VT_PI1;
+        n3, pcVal, pcVal_mut
+        from => {|n_ptr: &*mut i8|Ok(Box::new(**n_ptr))}
+        into => {|slf: Box<i8>| {
+            Box::into_raw(slf)
+        }}
+    }
+}
+
+variant_impl!{
+    impl Variant for Box<u16> {
+        VARTYPE = VT_PUI2;
+        n3, puiVal, puiVal_mut
+        from => {|n_ptr: &*mut u16|Ok(Box::new(**n_ptr))}
+        into => {|slf: Box<u16>| {
+            Box::into_raw(slf)
+        }}
+    }
+}
+
+variant_impl!{
+    impl Variant for Box<u32> {
+        VARTYPE = VT_PUI4;
+        n3, pulVal, pulVal_mut
+        from => {|n_ptr: &*mut u32|Ok(Box::new(**n_ptr))}
+        into => {|slf: Box<u32>| {
+            Box::into_raw(slf)
+        }}
+    }
+}
+
+variant_impl!{
+    impl Variant for Box<u64> {
+        VARTYPE = VT_UI8;
+        n3, pullVal, pullVal_mut
+        from => {|n_ptr: &*mut u64|Ok(Box::new(**n_ptr))}
+        into => {|slf: Box<u64>| {
+            Box::into_raw(slf)
+        }}
+    }
+}
+
+variant_impl!{
+    impl Variant for Box<Int> {
+        VARTYPE = VT_PINT;
+        n3, pintVal, pintVal_mut
+        from => {|n_ptr: &*mut i32| Ok(Box::new(Int(**n_ptr)))}
+        into => {|slf: Box<Int>| Box::into_raw(Box::new((*slf).0))}
+    }
+}
+
+variant_impl!{
+    impl Variant for Box<UInt> {
+        VARTYPE = VT_PUINT;
+        n3, puintVal, puintVal_mut
+        from => {|n_ptr: &*mut u32| Ok(Box::new(UInt(**n_ptr)))}
+        into => {|slf: Box<UInt>| Box::into_raw(Box::new((*slf).0))}
+    }
+}
+
+variant_impl!{
+    impl Variant for DecWrapper {
+        VARTYPE = VT_DECIMAL;
+        n1, decVal, decVal_mut
+        from => {|n_ptr: &DECIMAL|Ok(DecWrapper::from(*n_ptr))}
+        into => {|slf: DecWrapper| {
+            DECIMAL::from(slf)
+        }}
+    }
+}
+
 /// Enum to wrap Rust-types for conversion to/from 
 /// the C-level VARIANT data structure. 
 /// 
@@ -602,9 +703,9 @@ impl Variant {
         Variant::SCode(err)
     }
 
-    pub fn from_perror_code(err: Box<SCode>) -> Variant {
-        Variant::PSCode(err)
-    }
+    // pub fn from_perror_code(err: Box<SCode>) -> Variant {
+    //     Variant::PSCode(err)
+    // }
 
     pub fn vartype(&self) -> u32 {
         /*
@@ -827,10 +928,10 @@ impl From<Variant> for VARIANT {
                 let mut n_ptr = n3.boolVal_mut();
                 *n_ptr = VARIANT_BOOL::from(v)
             }, 
-            Variant::SCode(v) => unsafe {
-                let mut n_ptr = n3.scode_mut();
-                *n_ptr = v;
-            }
+            // Variant::SCode(v) => unsafe {
+            //     let mut n_ptr = n3.scode_mut();
+            //     *n_ptr = v;
+            // }
             Variant::Currency(val) => unsafe {
                 let mut n_ptr = n3.cyVal_mut();
                 *n_ptr = CY::from(val);
@@ -930,14 +1031,6 @@ impl From<Variant> for VARIANT {
                 let mut n_ptr = n3.ullVal_mut();
                 *n_ptr = v;
             }, 
-            Variant::Int(v) => unsafe {
-                let mut n_ptr = n3.intVal_mut();
-                *n_ptr = v;
-            }, 
-            Variant::UInt(v) => unsafe {
-                let mut n_ptr = n3.uintVal_mut();
-                *n_ptr = v;
-            }, 
             Variant::PDecimal(bptr) => unsafe {
                 let mut n_ptr = n3.pdecVal_mut();
                 let bptr = Box::new(DECIMAL::from(*bptr));
@@ -959,14 +1052,6 @@ impl From<Variant> for VARIANT {
                 let mut n_ptr = n3.pullVal_mut();
                 *n_ptr = Box::into_raw(bptr);
             }, 
-            Variant::PInt(bptr) => unsafe {
-                let mut n_ptr = n3.pintVal_mut();
-                *n_ptr = Box::into_raw(bptr);
-            }, 
-            Variant::PUInt(bptr) => unsafe {
-                let mut n_ptr = n3.puintVal_mut();
-                *n_ptr = Box::into_raw(bptr);
-            }, 
             Variant::Decimal(d) => unsafe {
                 let mut n_ptr = n1.decVal_mut();
                 *n_ptr = DECIMAL::from(d);
@@ -986,185 +1071,173 @@ impl From<Variant> for VARIANT {
     }
 }
 
-impl From<VARIANT> for Variant {
-    fn from(v: VARIANT) -> Variant {
-        let mut n1 = v.n1;
+// impl From<VARIANT> for Variant {
+//     fn from(v: VARIANT) -> Variant {
+//         let mut n1 = v.n1;
 
-        let vt = unsafe {
-            n1.n2_mut().vt
-        };
+//         let vt = unsafe {
+//             n1.n2_mut().vt
+//         };
 
-        let mut n3 = unsafe {
-            n1.n2_mut().n3
-        };
+//         let mut n3 = unsafe {
+//             n1.n2_mut().n3
+//         };
 
-        match vt as u32 {
-            VT_I8 => unsafe {
-                let mut n_ptr = n3.llVal();
-                Variant::LongLong(*n_ptr)
-            }, 
-            VT_I4 => unsafe {
-                let mut n_ptr = n3.lVal();
-                Variant::Long(*n_ptr)
-            }, 
-            VT_UI1 => unsafe {
-                let mut n_ptr = n3.bVal();
-                Variant::Byte(*n_ptr)
-            }, 
-            VT_R4 => unsafe {
-                let mut n_ptr = n3.fltVal();
-                Variant::Float(*n_ptr)
-            },
-            VT_R8 => unsafe {
-                let mut n_ptr = n3.dblVal();
-                Variant::Double(*n_ptr)
-            },
-            VT_BOOL => unsafe {
-                let mut n_ptr = n3.boolVal();
-                Variant::VBool(bool::from(VariantBool::from(*n_ptr)))
-            }, 
-            VT_ERROR => unsafe {
-                let mut n_ptr = n3.scode();
-                Variant::SCode(*n_ptr)
-            }, 
-            VT_CY => unsafe {
-                let mut n_ptr = n3.cyVal();
-                Variant::Currency(Currency::from(*n_ptr))
-            }, 
-            VT_DATE => unsafe {
-                let mut n_ptr = n3.date();
-                Variant::Date(Date::from(*n_ptr))
-            }, 
-            //VT_BSTR
-            VT_UNKNOWN => unsafe {
-                let mut n_ptr = n3.punkVal();
-                match NonNull::new(*n_ptr) {
-                    Some(nn) => Variant::Unknown(Ptr::new(nn)), 
-                    None => Variant::Null,
-                }
-            }, 
-            VT_DISPATCH => unsafe {
-                let mut n_ptr = n3.pdispVal();
-                match NonNull::new(*n_ptr) {
-                    Some(nn) => Variant::Dispatch(Ptr::new(nn)), 
-                    None => Variant::Null,
-                }
-            },
-            //VT_ARRAY
-            VT_PUI1 => unsafe {
-                let mut n_ptr = n3.pbVal();
-                Variant::PByte(Box::new(**n_ptr))
-            }, 
-            VT_PI2 => unsafe {
-                let mut n_ptr = n3.piVal();
-                Variant::PShort(Box::new(**n_ptr))
-            }, 
-            VT_PI4 => unsafe {
-                let mut n_ptr = n3.plVal();
-                Variant::PLong(Box::new(**n_ptr))
-            }, 
-            VT_PI8 => unsafe {
-                let mut n_ptr = n3.pllVal();
-                Variant::PLongLong(Box::new(**n_ptr))
-            }, 
-            VT_PR4 => unsafe {
-                let mut n_ptr = n3.pfltVal();
-                Variant::PFloat(Box::new(**n_ptr))
-            }, 
-            VT_PR8 => unsafe {
-                let mut n_ptr = n3.pdblVal();
-                Variant::PDouble(Box::new(**n_ptr))
-            }, 
-            VT_PBOOL => unsafe {
-                let mut n_ptr = n3.pboolVal();
-                Variant::PVBool(Box::new(bool::from(VariantBool::from(**n_ptr))))
-            }, 
-            VT_PERROR => unsafe {
-                let mut n_ptr = n3.pscode();
-                Variant::PSCode(Box::new(**n_ptr))
-            }, 
-            VT_PCY => unsafe {
-                let mut n_ptr = n3.pcyVal();
-                Variant::PCurrency(Box::new(Currency::from(**n_ptr)))
-            }, 
-            VT_PDATE => unsafe {
-                let mut n_ptr = n3.pdate();
-                Variant::PDate(Box::new(Date(**n_ptr)))
-            },
-            //VT_PBSTR 
-            VT_PUNKNOWN => unsafe {
-                let mut n_ptr = n3.ppunkVal_mut();
-                match NonNull::new((**n_ptr).clone()) {
-                    Some(nn) => Variant::PUnknown(Box::new(Ptr::new(nn))), 
-                    None => Variant::Null,
-                }
-            },
-            VT_PDISPATCH => unsafe {
-                let mut n_ptr = n3.ppdispVal_mut();
-                match NonNull::new((**n_ptr).clone()) {
-                    Some(nn) => Variant::PDispatch(Box::new(Ptr::new(nn))), 
-                    None => Variant::Null
-                }
-            }, 
-            //VT_PARRAY
-            VT_BYREF => unsafe {
-                let mut n_ptr = n3.byref();
-                match NonNull::new(*n_ptr) {
-                    Some(nn) => Variant::ByRef(Ptr::new(nn)), 
-                    None => Variant::Null
-                }
-            }, 
-            VT_I1 => unsafe {
-                let mut n_ptr = n3.cVal();
-                Variant::Char(*n_ptr)
-            }, 
-            VT_UI2 => unsafe {
-                let mut n_ptr = n3.uiVal();
-                Variant::UShort(*n_ptr)
-            }, 
-            VT_UI4 => unsafe {
-                let mut n_ptr = n3.ulVal();
-                Variant::ULong(*n_ptr)
-            }, 
-            VT_UI8 => unsafe {
-                let mut n_ptr = n3.ullVal();
-                Variant::ULongLong(*n_ptr)
-            }, 
-            VT_INT => unsafe {
-                Variant::Int(*(n3.intVal()))
-            }, 
-            VT_UINT => unsafe {
-                Variant::UInt(*(n3.uintVal()))
-            }, 
-            VT_PDECIMAL => unsafe {
-                Variant::PDecimal(Box::new(DecWrapper::from(**(n3.pdecVal()))))
-            }, 
-            VT_PI1 => unsafe {
-                Variant::PChar(Box::new(**(n3.pcVal())))
-            }, 
-            VT_PUI2 => unsafe {
-                Variant::PUShort(Box::new(**(n3.puiVal())))
-            }, 
-            VT_PUI4 => unsafe {
-                Variant::PULong(Box::new(**(n3.pulVal())))
-            }, 
-            VT_PUI8 => unsafe {
-                Variant::PULongLong(Box::new(**(n3.pullVal())))
-            }, 
-            VT_PINT => unsafe {
-                Variant::PInt(Box::new(**(n3.pintVal())))
-            }, 
-            VT_PUINT => unsafe {
-                Variant::PUInt(Box::new(**(n3.puintVal())))
-            }, 
-            VT_DECIMAL => unsafe {
-                Variant::Decimal(DecWrapper::from(*(n1.decVal())))
-            }, 
-            VT_EMPTY => Variant::Empty, 
-            VT_NULL => Variant::Null,
-            _ => unimplemented!()
-        }
+//         match vt as u32 {
+//             VT_I8 => unsafe {
+//                 let mut n_ptr = n3.llVal();
+//                 Variant::LongLong(*n_ptr)
+//             }, 
+//             VT_I4 => unsafe {
+//                 let mut n_ptr = n3.lVal();
+//                 Variant::Long(*n_ptr)
+//             }, 
+//             VT_UI1 => unsafe {
+//                 let mut n_ptr = n3.bVal();
+//                 Variant::Byte(*n_ptr)
+//             }, 
+//             VT_R4 => unsafe {
+//                 let mut n_ptr = n3.fltVal();
+//                 Variant::Float(*n_ptr)
+//             },
+//             VT_R8 => unsafe {
+//                 let mut n_ptr = n3.dblVal();
+//                 Variant::Double(*n_ptr)
+//             },
+//             VT_BOOL => unsafe {
+//                 let mut n_ptr = n3.boolVal();
+//                 Variant::VBool(bool::from(VariantBool::from(*n_ptr)))
+//             }, 
+//             // VT_ERROR => unsafe {
+//             //     let mut n_ptr = n3.scode();
+//             //     Variant::SCode(*n_ptr)
+//             // }, 
+//             VT_CY => unsafe {
+//                 let mut n_ptr = n3.cyVal();
+//                 Variant::Currency(Currency::from(*n_ptr))
+//             }, 
+//             VT_DATE => unsafe {
+//                 let mut n_ptr = n3.date();
+//                 Variant::Date(Date::from(*n_ptr))
+//             }, 
+//             //VT_BSTR
+//             VT_UNKNOWN => unsafe {
+//                 let mut n_ptr = n3.punkVal();
+//                 match NonNull::new(*n_ptr) {
+//                     Some(nn) => Variant::Unknown(Ptr::new(nn)), 
+//                     None => Variant::Null,
+//                 }
+//             }, 
+//             VT_DISPATCH => unsafe {
+//                 let mut n_ptr = n3.pdispVal();
+//                 match NonNull::new(*n_ptr) {
+//                     Some(nn) => Variant::Dispatch(Ptr::new(nn)), 
+//                     None => Variant::Null,
+//                 }
+//             },
+//             //VT_ARRAY
+//             VT_PUI1 => unsafe {
+//                 let mut n_ptr = n3.pbVal();
+//                 Variant::PByte(Box::new(**n_ptr))
+//             }, 
+//             VT_PI2 => unsafe {
+//                 let mut n_ptr = n3.piVal();
+//                 Variant::PShort(Box::new(**n_ptr))
+//             }, 
+//             VT_PI4 => unsafe {
+//                 let mut n_ptr = n3.plVal();
+//                 Variant::PLong(Box::new(**n_ptr))
+//             }, 
+//             VT_PI8 => unsafe {
+//                 let mut n_ptr = n3.pllVal();
+//                 Variant::PLongLong(Box::new(**n_ptr))
+//             }, 
+//             VT_PR4 => unsafe {
+//                 let mut n_ptr = n3.pfltVal();
+//                 Variant::PFloat(Box::new(**n_ptr))
+//             }, 
+//             VT_PR8 => unsafe {
+//                 let mut n_ptr = n3.pdblVal();
+//                 Variant::PDouble(Box::new(**n_ptr))
+//             }, 
+//             VT_PBOOL => unsafe {
+//                 let mut n_ptr = n3.pboolVal();
+//                 Variant::PVBool(Box::new(bool::from(VariantBool::from(**n_ptr))))
+//             }, 
+//             VT_PERROR => unsafe {
+//                 let mut n_ptr = n3.pscode();
+//                 Variant::PSCode(Box::new(**n_ptr))
+//             }, 
+//             VT_PCY => unsafe {
+//                 let mut n_ptr = n3.pcyVal();
+//                 Variant::PCurrency(Box::new(Currency::from(**n_ptr)))
+//             }, 
+//             VT_PDATE => unsafe {
+//                 let mut n_ptr = n3.pdate();
+//                 Variant::PDate(Box::new(Date(**n_ptr)))
+//             },
+//             //VT_PBSTR 
+//             VT_PUNKNOWN => unsafe {
+//                 let mut n_ptr = n3.ppunkVal_mut();
+//                 match NonNull::new((**n_ptr).clone()) {
+//                     Some(nn) => Variant::PUnknown(Box::new(Ptr::new(nn))), 
+//                     None => Variant::Null,
+//                 }
+//             },
+//             VT_PDISPATCH => unsafe {
+//                 let mut n_ptr = n3.ppdispVal_mut();
+//                 match NonNull::new((**n_ptr).clone()) {
+//                     Some(nn) => Variant::PDispatch(Box::new(Ptr::new(nn))), 
+//                     None => Variant::Null
+//                 }
+//             }, 
+//             //VT_PARRAY
+//             VT_BYREF => unsafe {
+//                 let mut n_ptr = n3.byref();
+//                 match NonNull::new(*n_ptr) {
+//                     Some(nn) => Variant::ByRef(Ptr::new(nn)), 
+//                     None => Variant::Null
+//                 }
+//             }, 
+//             VT_I1 => unsafe {
+//                 let mut n_ptr = n3.cVal();
+//                 Variant::Char(*n_ptr)
+//             }, 
+//             VT_UI2 => unsafe {
+//                 let mut n_ptr = n3.uiVal();
+//                 Variant::UShort(*n_ptr)
+//             }, 
+//             VT_UI4 => unsafe {
+//                 let mut n_ptr = n3.ulVal();
+//                 Variant::ULong(*n_ptr)
+//             }, 
+//             VT_UI8 => unsafe {
+//                 let mut n_ptr = n3.ullVal();
+//                 Variant::ULongLong(*n_ptr)
+//             }, 
+//             VT_PDECIMAL => unsafe {
+//                 Variant::PDecimal(Box::new(DecWrapper::from(**(n3.pdecVal()))))
+//             }, 
+//             VT_PI1 => unsafe {
+//                 Variant::PChar(Box::new(**(n3.pcVal())))
+//             }, 
+//             VT_PUI2 => unsafe {
+//                 Variant::PUShort(Box::new(**(n3.puiVal())))
+//             }, 
+//             VT_PUI4 => unsafe {
+//                 Variant::PULong(Box::new(**(n3.pulVal())))
+//             }, 
+//             VT_PUI8 => unsafe {
+//                 Variant::PULongLong(Box::new(**(n3.pullVal())))
+//             }, 
+//             VT_DECIMAL => unsafe {
+//                 Variant::Decimal(DecWrapper::from(*(n1.decVal())))
+//             }, 
+//             VT_EMPTY => Variant::Empty, 
+//             VT_NULL => Variant::Null,
+//             _ => unimplemented!()
+//         }
 
-        //Variant::Null
-    }
-}
+//         //Variant::Null
+//     }
+// }

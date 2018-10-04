@@ -144,9 +144,9 @@ impl From<VariantBool> for bool {
     }
 }
 
-pub type Int = i32;
-pub type UInt = u32;
-pub type SCode = i32;
+pub struct Int(pub i32);
+pub struct UInt(pub u32);
+pub struct SCode(pub i32);
 
 #[cfg(test)]
 mod tests {
