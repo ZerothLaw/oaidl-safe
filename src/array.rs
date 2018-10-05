@@ -1,6 +1,8 @@
 use std::ptr::{NonNull, null_mut};
 use rust_decimal::Decimal;
 
+use widestring::U16String;
+
 use winapi::ctypes::{c_long, c_void};
 
 use winapi::shared::minwindef::{UINT, ULONG,};
@@ -11,7 +13,7 @@ use winapi::shared::wtypes::{
     CY,  
     VARTYPE,
     VARIANT_BOOL,
-    //VT_BSTR, 
+    VT_BSTR, 
     VT_BOOL,
     VT_CY,
     VT_DATE,
@@ -37,6 +39,7 @@ use winapi::shared::wtypesbase::{SCODE};
 use winapi::um::oaidl::{IDispatch, LPSAFEARRAY, LPSAFEARRAYBOUND, VARIANT, SAFEARRAY, SAFEARRAYBOUND};
 use winapi::um::unknwnbase::IUnknown;
 
+use bstr::BStringExt;
 use ptr::Ptr;
 use types::{Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool};
 use variant::{Variant, VariantType};
@@ -225,6 +228,23 @@ safe_arr_impl!{impl SafeArrayElement for Date{
     }
 }}
 // safe_arr_impl!(String => VT_BSTR);
+safe_arr_impl!{impl SafeArrayElement for String {
+    SFTYPE = VT_BSTR;
+    from => {|psa, ix|{
+        let mut bstr: *mut u16 = null_mut();
+        let hr = SafeArrayGetElement(psa, &ix, &mut bstr as *mut _ as *mut c_void );
+        (hr, U16String::from_bstr(bstr).to_string_lossy())
+    }}
+    into => {|slf: &mut String, psa, ix|{
+        let bstr = U16String::from_str(slf);
+        let bstr = match bstr.allocate_bstr() {
+            Ok(bstr) => bstr, 
+            Err(()) => panic!("Nope"),
+        };
+        let mut bstr = bstr.as_ptr();
+        SafeArrayPutElement(psa, &ix, &mut bstr as *mut _ as *mut c_void)
+    }}
+}}
 safe_arr_impl!{impl SafeArrayElement for Ptr<IDispatch>{
     SFTYPE = VT_DISPATCH; 
     from => {

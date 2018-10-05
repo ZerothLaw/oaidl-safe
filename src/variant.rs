@@ -123,12 +123,14 @@ use std::ptr::NonNull;
 
 use rust_decimal::Decimal;
 
+use widestring::U16String;
+
 use winapi::ctypes::c_void;
 use winapi::shared::wtypes::{
     CY, DATE, DECIMAL,
     VARIANT_BOOL,
     VT_ARRAY, 
-    //VT_BSTR, 
+    VT_BSTR, 
     VT_BOOL,
     VT_BYREF, 
     VT_CY,
@@ -156,9 +158,11 @@ use winapi::shared::wtypes::{
 };
 use winapi::shared::wtypesbase::{SCODE};
 use winapi::um::oaidl::{IDispatch,  __tagVARIANT, SAFEARRAY, VARIANT, VARIANT_n3, VARIANT_n1};
+use winapi::um::oleauto::{VariantInit, VariantClear};
 use winapi::um::unknwnbase::IUnknown;
 
 use array::{SafeArray, SafeArrayElement};
+use bstr::{BStringExt};
 use ptr::Ptr;
 use types::{Date, DecWrapper, Currency, Int, SCode, UInt, VariantBool };
 
@@ -173,7 +177,7 @@ pub const VT_PBOOL: u32 = VT_BYREF | VT_BOOL;
 pub const VT_PERROR: u32 = VT_BYREF | VT_ERROR;
 pub const VT_PCY: u32 = VT_BYREF | VT_CY;
 pub const VT_PDATE: u32 = VT_BYREF | VT_DATE;
-//pub const VT_PBSTR: u32 = VT_BYREF | VT_BSTR;
+pub const VT_PBSTR: u32 = VT_BYREF | VT_BSTR;
 pub const VT_PUNKNOWN: u32 = VT_BYREF | VT_UNKNOWN;
 pub const VT_PDISPATCH: u32 = VT_BYREF | VT_DISPATCH;
 pub const VT_PDECIMAL: u32 = VT_BYREF | VT_DECIMAL;
@@ -233,16 +237,20 @@ macro_rules! variant_impl {
         impl $(<$tn: $tc>)* VariantType for $t {
             const VARTYPE: u32 = $vt;
             fn from_variant(var: Ptr<VARIANT>) -> Result<Self, ()>{
-                let var = unsafe {*var.as_ptr()};
+                let mut var = unsafe {*var.as_ptr()};
                 let mut n1 = var.n1;
 
                 let n3 = unsafe {
                     n1.n2_mut().n3
                 };
-                unsafe {
+                let ret = unsafe {
                     let n_ptr = n3.$un_n();
                     $from(n_ptr)
-                }
+                };
+                unsafe {
+                    VariantClear(&mut var)
+                };
+                ret
             }
 
             fn into_variant(&mut self) -> Result<Ptr<VARIANT>, ()> {
@@ -278,12 +286,16 @@ macro_rules! variant_impl {
         impl $(<$tn: $tc>)* VariantType for $t {
             const VARTYPE: u32 = $vt;
             fn from_variant(var: Ptr<VARIANT>) -> Result<Self, ()>{
-                let var = unsafe {*var.as_ptr()};
+                let mut var = unsafe {*var.as_ptr()};
                 let n1 = var.n1;
-                unsafe {
+                let ret = unsafe {
                     let n_ptr = n1.$un_n();
                     $from(n_ptr)
-                }
+                };
+                unsafe {
+                    VariantClear(&mut var)
+                };
+                ret
             }
 
            fn into_variant(&mut self) -> Result<Ptr<VARIANT>, ()> {
@@ -389,7 +401,20 @@ variant_impl!{
         into => {|slf: &mut Date| DATE::from(*slf)}
     }
 }
-//BSTR
+variant_impl!{
+    impl Variant for String {
+        VARTYPE = VT_BSTR;
+        n3, bstrVal, bstrVal_mut
+        from => {|n_ptr: &*mut u16| {
+            let bstr = U16String::from_bstr(*n_ptr);
+            Ok(bstr.to_string_lossy())
+        }}
+        into => {|slf: &mut String|{
+            let bstr = U16String::from_str(slf);
+            bstr.allocate_bstr().unwrap().as_ptr()
+        }}
+    }
+}
 variant_impl!{
     impl Variant for Ptr<IUnknown> {
         VARTYPE = VT_UNKNOWN;
@@ -501,6 +526,21 @@ variant_impl!{
                 Box::into_raw(bptr)
             }
         }
+    }
+}
+variant_impl!{
+    impl Variant for Box<String> {
+        VARTYPE = VT_PBSTR;
+        n3, pbstrVal, pbstrVal_mut
+        from => {|n_ptr: &*mut *mut u16| {
+            let bstr = U16String::from_bstr(**n_ptr);
+            Ok(Box::new(bstr.to_string_lossy()))
+        }}
+        into => {|slf: &mut Box<String>|{
+            let bstr = U16String::from_str(&**slf);
+            let bstr = Box::new(bstr.allocate_bstr().unwrap().as_ptr());
+            Box::into_raw(bstr)
+        }}
     }
 }
 variant_impl! {
@@ -779,5 +819,10 @@ mod test {
         let new_v = u8::from_variant(r).unwrap();
         println!("{:?}", new_v);
         assert_eq!(new_v, 100u8 );
+
+        let mut vs = String::from("test");
+        let r = vs.into_variant().unwrap();
+        let new_vs = String::from_variant(r).unwrap();
+        assert_eq!(new_vs, String::from("test"));
     }
 }

@@ -1,4 +1,5 @@
 extern crate rust_decimal;
+extern crate widestring;
 extern crate winapi;
 
 mod array;
