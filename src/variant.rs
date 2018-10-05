@@ -158,10 +158,10 @@ use winapi::shared::wtypes::{
 };
 use winapi::shared::wtypesbase::{SCODE};
 use winapi::um::oaidl::{IDispatch,  __tagVARIANT, SAFEARRAY, VARIANT, VARIANT_n3, VARIANT_n1};
-use winapi::um::oleauto::{VariantInit, VariantClear};
+use winapi::um::oleauto::{VariantClear};
 use winapi::um::unknwnbase::IUnknown;
 
-use array::{SafeArray, SafeArrayElement};
+use array::{SafeArrayElement, SafeArrayExt};
 use bstr::{BStringExt};
 use ptr::Ptr;
 use types::{Date, DecWrapper, Currency, Int, SCode, UInt, VariantBool };
@@ -187,7 +187,7 @@ pub const VT_PUI4: u32 = VT_BYREF | VT_UI4;
 pub const VT_PINT: u32 = VT_BYREF | VT_INT;
 pub const VT_PUINT: u32 = VT_BYREF | VT_UINT;
 
-pub trait VariantType: Sized { //Would like Clone + Default, but IDispatch and IUnknown don't implement them
+pub trait VariantExt: Sized { //Would like Clone + Default, but IDispatch and IUnknown don't implement them
     const VARTYPE: u32;
 
     fn from_variant(var: Ptr<VARIANT>) -> Result<Self, ()>;  
@@ -195,10 +195,10 @@ pub trait VariantType: Sized { //Would like Clone + Default, but IDispatch and I
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Variant<T: VariantType>(T);
+pub struct Variant<T: VariantExt>(T);
 
 #[allow(dead_code)]
-impl<T: VariantType> Variant<T> {
+impl<T: VariantExt> Variant<T> {
     pub fn new(t: T) -> Variant<T> {
         Variant(t)
     }
@@ -227,14 +227,14 @@ impl<T: VariantType> Variant<T> {
 
 macro_rules! variant_impl {
     (
-        impl $(<$tn:ident : $tc:ident>)* Variant for $t:ty {
+        impl $(<$tn:ident : $tc:ident>)* VariantExt for $t:ty {
             VARTYPE = $vt:expr;
             n3, $un_n:ident, $un_n_mut:ident
             from => {$from:expr}
             into => {$into:expr}
         }
     ) => {
-        impl $(<$tn: $tc>)* VariantType for $t {
+        impl $(<$tn: $tc>)* VariantExt for $t {
             const VARTYPE: u32 = $vt;
             fn from_variant(var: Ptr<VARIANT>) -> Result<Self, ()>{
                 let mut var = unsafe {*var.as_ptr()};
@@ -260,7 +260,7 @@ macro_rules! variant_impl {
                     let n_ptr = n3.$un_n_mut();
                     *n_ptr = $into(self)
                 }
-                let tv = __tagVARIANT { vt: <Self as VariantType>::VARTYPE as u16, 
+                let tv = __tagVARIANT { vt: <Self as VariantExt>::VARTYPE as u16, 
                                 wReserved1: 0, 
                                 wReserved2: 0, 
                                 wReserved3: 0, 
@@ -276,14 +276,14 @@ macro_rules! variant_impl {
     };
 
     (
-        impl $(<$tn:ident : $tc:ident>)* Variant for $t:ty {
+        impl $(<$tn:ident : $tc:ident>)* VariantExt for $t:ty {
             VARTYPE = $vt:expr;
             n1, $un_n:ident, $un_n_mut:ident
             from => {$from:expr}
             into => {$into:expr}
         }
     ) => {
-        impl $(<$tn: $tc>)* VariantType for $t {
+        impl $(<$tn: $tc>)* VariantExt for $t {
             const VARTYPE: u32 = $vt;
             fn from_variant(var: Ptr<VARIANT>) -> Result<Self, ()>{
                 let mut var = unsafe {*var.as_ptr()};
@@ -305,7 +305,7 @@ macro_rules! variant_impl {
                     let n_ptr = n1.$un_n_mut();
                     *n_ptr = $into(self)
                 }
-                let tv = __tagVARIANT { vt: <Self as VariantType>::VARTYPE as u16, 
+                let tv = __tagVARIANT { vt: <Self as VariantExt>::VARTYPE as u16, 
                                 wReserved1: 0, 
                                 wReserved2: 0, 
                                 wReserved3: 0, 
@@ -322,7 +322,7 @@ macro_rules! variant_impl {
 }
 
 variant_impl!{
-    impl Variant for i64 {
+    impl VariantExt for i64 {
         VARTYPE = VT_I8;
         n3, llVal, llVal_mut
         from => {|n_ptr: &i64| {Ok(*n_ptr)}}
@@ -330,7 +330,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for i32 {
+    impl VariantExt for i32 {
         VARTYPE = VT_I4;
         n3, lVal, lVal_mut
         from => {|n_ptr: &i32| Ok(*n_ptr)}
@@ -338,7 +338,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for u8 {
+    impl VariantExt for u8 {
         VARTYPE = VT_UI1;
         n3, bVal, bVal_mut
         from => {|n_ptr: &u8| Ok(*n_ptr)}
@@ -346,7 +346,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for i16 {
+    impl VariantExt for i16 {
         VARTYPE = VT_I2;
         n3, iVal, iVal_mut
         from => {|n_ptr: &i16| Ok(*n_ptr)}
@@ -354,7 +354,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for f32 {
+    impl VariantExt for f32 {
         VARTYPE = VT_R4;
         n3, fltVal, fltVal_mut
         from => {|n_ptr: &f32| Ok(*n_ptr)}
@@ -362,7 +362,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for f64 {
+    impl VariantExt for f64 {
         VARTYPE = VT_R8;
         n3, dblVal, dblVal_mut
         from => {|n_ptr: &f64| Ok(*n_ptr)}
@@ -370,15 +370,15 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for bool {
+    impl VariantExt for bool {
         VARTYPE = VT_BOOL;
         n3, boolVal, boolVal_mut
         from => {|n_ptr: &VARIANT_BOOL| Ok(bool::from(VariantBool::from(*n_ptr)))}
-        into => {|slf: &mut bool| VARIANT_BOOL::from(*slf)}
+        into => {|slf: &mut bool| VARIANT_BOOL::from(VariantBool::from(*slf))}
     }
 }
 variant_impl!{
-    impl Variant for SCode {
+    impl VariantExt for SCode {
         VARTYPE = VT_ERROR;
         n3, scode, scode_mut
         from => {|n_ptr: &SCODE| Ok(SCode(*n_ptr))}
@@ -386,7 +386,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Currency {
+    impl VariantExt for Currency {
         VARTYPE = VT_CY;
         n3, cyVal, cyVal_mut
         from => {|n_ptr: &CY| Ok(Currency::from(*n_ptr))}
@@ -394,7 +394,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Date {
+    impl VariantExt for Date {
         VARTYPE = VT_DATE;
         n3, date, date_mut
         from => {|n_ptr: &DATE| Ok(Date::from(*n_ptr))}
@@ -402,7 +402,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for String {
+    impl VariantExt for String {
         VARTYPE = VT_BSTR;
         n3, bstrVal, bstrVal_mut
         from => {|n_ptr: &*mut u16| {
@@ -416,7 +416,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Ptr<IUnknown> {
+    impl VariantExt for Ptr<IUnknown> {
         VARTYPE = VT_UNKNOWN;
         n3, punkVal, punkVal_mut
         from => {|n_ptr: &* mut IUnknown| Ok(Ptr::with_checked(*n_ptr).unwrap())}
@@ -424,7 +424,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Ptr<IDispatch> {
+    impl VariantExt for Ptr<IDispatch> {
         VARTYPE = VT_DISPATCH;
         n3, pdispVal, pdispVal_mut
         from => {|n_ptr: &* mut IDispatch| Ok(Ptr::with_checked(*n_ptr).unwrap())}
@@ -432,7 +432,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<u8> {
+    impl VariantExt for Box<u8> {
         VARTYPE = VT_PUI1;
         n3, pbVal, pbVal_mut
         from => {|n_ptr: &* mut u8| Ok(Box::new(**n_ptr))}
@@ -440,7 +440,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<i16> {
+    impl VariantExt for Box<i16> {
         VARTYPE = VT_PI2;
         n3, piVal, piVal_mut
         from => {|n_ptr: &* mut i16| Ok(Box::new(**n_ptr))}
@@ -448,7 +448,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<i32> {
+    impl VariantExt for Box<i32> {
         VARTYPE = VT_PI4;
         n3, plVal, plVal_mut
         from => {|n_ptr: &* mut i32| Ok(Box::new(**n_ptr))}
@@ -456,7 +456,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<i64> {
+    impl VariantExt for Box<i64> {
         VARTYPE = VT_PI8;
         n3, pllVal, pllVal_mut
         from => {|n_ptr: &* mut i64| Ok(Box::new(**n_ptr))}
@@ -464,7 +464,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<f32> {
+    impl VariantExt for Box<f32> {
         VARTYPE = VT_PR4;
         n3, pfltVal, pfltVal_mut
         from => {|n_ptr: &* mut f32| Ok(Box::new(**n_ptr))}
@@ -472,7 +472,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<f64> {
+    impl VariantExt for Box<f64> {
         VARTYPE = VT_PR8;
         n3, pdblVal, pdblVal_mut
         from => {|n_ptr: &* mut f64| Ok(Box::new(**n_ptr))}
@@ -480,7 +480,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<bool> {
+    impl VariantExt for Box<bool> {
         VARTYPE = VT_PBOOL;
         n3, pboolVal, pboolVal_mut
         from => {
@@ -495,7 +495,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<SCode> {
+    impl VariantExt for Box<SCode> {
         VARTYPE = VT_PERROR;
         n3, pscode, pscode_mut
         from => {|n_ptr: &*mut SCODE| Ok(Box::new(SCode(**n_ptr)))}
@@ -503,7 +503,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<Currency> {
+    impl VariantExt for Box<Currency> {
         VARTYPE = VT_PCY;
         n3, pcyVal, pcyVal_mut
         from => { |n_ptr: &*mut CY| Ok(Box::new(Currency::from(**n_ptr))) }
@@ -516,7 +516,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<Date> {
+    impl VariantExt for Box<Date> {
         VARTYPE = VT_PDATE;
         n3, pdate, pdate_mut
         from => { |n_ptr: &*mut f64| Ok(Box::new(Date(**n_ptr))) }
@@ -529,7 +529,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<String> {
+    impl VariantExt for Box<String> {
         VARTYPE = VT_PBSTR;
         n3, pbstrVal, pbstrVal_mut
         from => {|n_ptr: &*mut *mut u16| {
@@ -544,7 +544,7 @@ variant_impl!{
     }
 }
 variant_impl! {
-    impl Variant for Box<Ptr<IUnknown>> {
+    impl VariantExt for Box<Ptr<IUnknown>> {
         VARTYPE = VT_PUNKNOWN;
         n3, ppunkVal, ppunkVal_mut
         from => {
@@ -564,7 +564,7 @@ variant_impl! {
     }
 }
 variant_impl! {
-    impl Variant for Box<Ptr<IDispatch>> {
+    impl VariantExt for Box<Ptr<IDispatch>> {
         VARTYPE = VT_PDISPATCH;
         n3, ppdispVal, ppdispVal_mut
         from => {
@@ -584,7 +584,7 @@ variant_impl! {
     }
 }
 variant_impl!{
-    impl<T: VariantType> Variant for Variant<T> {
+    impl<T: VariantExt> VariantExt for Variant<T> {
         VARTYPE = VT_VARIANT;
         n3, pvarVal, pvarVal_mut
         from => {|n_ptr: &*mut VARIANT| {
@@ -601,19 +601,19 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl<T: SafeArrayElement> Variant for SafeArray<T>{
+    impl<T: SafeArrayElement> VariantExt for Vec<T>{
         VARTYPE = VT_ARRAY;
         n3, parray, parray_mut
         from => {
             |n_ptr: &*mut SAFEARRAY| {
-                match SafeArray::<T>::from_safearray(*n_ptr) {
+                match Vec::<T>::from_safearray(*n_ptr) {
                     Ok(sa) => Ok(sa), 
                     Err(_) => Err(())
                 }
             }
         }
         into => {
-            |slf: &mut SafeArray<T>| {
+            |slf: &mut Vec<T>| {
                 match slf.into_safearray() {
                     Ok(psa) => {
                         psa.as_ptr()
@@ -627,7 +627,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Ptr<c_void> {
+    impl VariantExt for Ptr<c_void> {
         VARTYPE = VT_BYREF;
         n3, byref, byref_mut
         from => {|n_ptr: &*mut c_void| {
@@ -640,7 +640,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for i8 {
+    impl VariantExt for i8 {
         VARTYPE = VT_I1;
         n3, cVal, cVal_mut
         from => {|n_ptr: &i8|Ok(*n_ptr)}
@@ -648,7 +648,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for u16 {
+    impl VariantExt for u16 {
         VARTYPE = VT_UI2;
         n3, uiVal, uiVal_mut
         from => {|n_ptr: &u16|Ok(*n_ptr)}
@@ -656,7 +656,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for u32 {
+    impl VariantExt for u32 {
         VARTYPE = VT_UI4;
         n3, ulVal, ulVal_mut
         from => {|n_ptr: &u32|Ok(*n_ptr)}
@@ -664,7 +664,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for u64 {
+    impl VariantExt for u64 {
         VARTYPE = VT_UI8;
         n3, ullVal, ullVal_mut
         from => {|n_ptr: &u64|Ok(*n_ptr)}
@@ -672,7 +672,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Int {
+    impl VariantExt for Int {
         VARTYPE = VT_INT;
         n3, intVal, intVal_mut
         from => {|n_ptr: &i32| Ok(Int(*n_ptr))}
@@ -680,7 +680,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for UInt {
+    impl VariantExt for UInt {
         VARTYPE = VT_UINT;
         n3, uintVal, uintVal_mut
         from => {|n_ptr: &u32| Ok(UInt(*n_ptr))}
@@ -688,7 +688,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<DecWrapper> {
+    impl VariantExt for Box<DecWrapper> {
         VARTYPE = VT_PDECIMAL;
         n3, pdecVal, pdecVal_mut
         from => {|n_ptr: &*mut DECIMAL|Ok(Box::new(DecWrapper::from(**n_ptr)))}
@@ -699,7 +699,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<Decimal> {
+    impl VariantExt for Box<Decimal> {
         VARTYPE = VT_PDECIMAL;
         n3, pdecVal, pdecVal_mut
         from => {|n_ptr: &*mut DECIMAL|Ok(Box::new(Decimal::from(DecWrapper::from(**n_ptr))))}
@@ -710,7 +710,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<i8> {
+    impl VariantExt for Box<i8> {
         VARTYPE = VT_PI1;
         n3, pcVal, pcVal_mut
         from => {|n_ptr: &*mut i8|Ok(Box::new(**n_ptr))}
@@ -720,7 +720,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<u16> {
+    impl VariantExt for Box<u16> {
         VARTYPE = VT_PUI2;
         n3, puiVal, puiVal_mut
         from => {|n_ptr: &*mut u16|Ok(Box::new(**n_ptr))}
@@ -730,7 +730,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<u32> {
+    impl VariantExt for Box<u32> {
         VARTYPE = VT_PUI4;
         n3, pulVal, pulVal_mut
         from => {|n_ptr: &*mut u32|Ok(Box::new(**n_ptr))}
@@ -740,7 +740,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<u64> {
+    impl VariantExt for Box<u64> {
         VARTYPE = VT_PUI8;
         n3, pullVal, pullVal_mut
         from => {|n_ptr: &*mut u64|Ok(Box::new(**n_ptr))}
@@ -750,7 +750,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<Int> {
+    impl VariantExt for Box<Int> {
         VARTYPE = VT_PINT;
         n3, pintVal, pintVal_mut
         from => {|n_ptr: &*mut i32| Ok(Box::new(Int(**n_ptr)))}
@@ -758,7 +758,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Box<UInt> {
+    impl VariantExt for Box<UInt> {
         VARTYPE = VT_PUINT;
         n3, puintVal, puintVal_mut
         from => {|n_ptr: &*mut u32| Ok(Box::new(UInt(**n_ptr)))}
@@ -766,7 +766,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for DecWrapper {
+    impl VariantExt for DecWrapper {
         VARTYPE = VT_DECIMAL;
         n1, decVal, decVal_mut
         from => {|n_ptr: &DECIMAL|Ok(DecWrapper::from(*n_ptr))}
@@ -776,7 +776,7 @@ variant_impl!{
     }
 }
 variant_impl!{
-    impl Variant for Decimal {
+    impl VariantExt for Decimal {
         VARTYPE = VT_DECIMAL;
         n1, decVal, decVal_mut
         from => {|n_ptr: &DECIMAL| Ok(Decimal::from(DecWrapper::from(*n_ptr)))}
@@ -787,7 +787,7 @@ variant_impl!{
 pub struct VtEmpty{}
 pub struct VtNull{}
 
-impl VariantType for VtEmpty {
+impl VariantExt for VtEmpty {
     const VARTYPE: u32 = VT_EMPTY;
     fn into_variant(&mut self) -> Result<Ptr<VARIANT>, ()> {
         //TODO: fix this
@@ -798,7 +798,7 @@ impl VariantType for VtEmpty {
     }
 }
 
-impl VariantType for VtNull {
+impl VariantExt for VtNull {
     const VARTYPE: u32 = VT_NULL;
     fn into_variant(&mut self) -> Result<Ptr<VARIANT>, ()> {
         Err(())
@@ -811,18 +811,106 @@ impl VariantType for VtNull {
 #[cfg(test)]
 mod test {
     use super::*;
-    
+    macro_rules! validate_variant {
+        ($t:ident, $val:expr, $vt:expr) => {
+            let mut v = $val;
+            let var = match v.into_variant() {
+                Ok(var) => var, 
+                Err(()) => panic!("Error")
+            };
+            assert!(!var.as_ptr().is_null());
+            unsafe {
+                let pvar = var.as_ptr();
+                let n1 = (*pvar).n1;
+                let tv: &__tagVARIANT = n1.n2();
+                assert_eq!(tv.vt as u32, $vt);
+            };
+            let var = $t::from_variant(var);
+            assert_eq!(v, var.unwrap());
+            };
+    }
     #[test]
-    fn test_variant() {
-        let mut value = 100u8;
-        let r = value.into_variant().unwrap();
-        let new_v = u8::from_variant(r).unwrap();
-        println!("{:?}", new_v);
-        assert_eq!(new_v, 100u8 );
+    fn test_i64() {
+        validate_variant!(i64, 1337i64, VT_I8);
+    }
+    #[test]
+    fn test_i32() {
+        validate_variant!(i32, 1337i32, VT_I4);
+    }
+    #[test]
+    fn test_u8() {
+        validate_variant!(u8, 137u8, VT_UI1);
+    }
+        #[test]
+    fn test_i16() {
+        validate_variant!(i16, 1337i16, VT_I2);
+    }
+    #[test]
+    fn test_f32() {
+        validate_variant!(f32, 1337.9f32, VT_R4);
+    }
+    #[test]
+    fn test_f64() {
+        validate_variant!(f64, 1337.9f64, VT_R8);
+    }
+    #[test]
+    fn test_bool_t() {
+        validate_variant!(bool, true, VT_BOOL);
+    }
 
-        let mut vs = String::from("test");
-        let r = vs.into_variant().unwrap();
-        let new_vs = String::from_variant(r).unwrap();
-        assert_eq!(new_vs, String::from("test"));
+    #[test]
+    fn test_bool_f() {
+        validate_variant!(bool, false, VT_BOOL);
+    }
+
+    #[test]
+    fn test_scode() {
+        validate_variant!(SCode, SCode(137), VT_ERROR);
+    }
+
+    #[test]
+    fn test_cy() {
+        validate_variant!(Currency, Currency(137), VT_CY);
+    }
+
+    #[test]
+    fn test_date() {
+        validate_variant!(Date, Date(137.7), VT_DATE);
+    }
+
+    #[test]
+    fn test_str() {
+        validate_variant!(String, String::from("testing abc1267 ?Ťũřǐꝥꞔ"), VT_BSTR);
+    }
+
+    #[test]
+    fn test_box_u8() {
+        type Bu8 = Box<u8>;
+        validate_variant!(Bu8, Box::new(139), VT_PUI1);
+    }
+
+    #[test]
+    fn test_box_i16() {
+        type Bi16 = Box<i16>;
+        validate_variant!(Bi16, Box::new(139), VT_PI2);
+    }
+    //test Variant<T>
+    //test SafeArray<T>
+    //Ptr<c_void>
+    #[test]
+    fn test_i8() {
+        validate_variant!(i8, -119i8, VT_I1);
+    }
+    #[test]
+    fn test_u16() {
+        validate_variant!(u16, 119u16, VT_UI2);
+    }
+    #[test]
+    fn test_u32() {
+        validate_variant!(u32, 11976u32, VT_UI4);
+    }
+    #[test]
+    fn test_u64() {
+        validate_variant!(u64, 11976u64, VT_UI8);
     }
 }

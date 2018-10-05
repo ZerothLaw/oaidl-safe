@@ -1,4 +1,6 @@
+use std::marker::PhantomData;
 use std::ptr::{NonNull, null_mut};
+
 use rust_decimal::Decimal;
 
 use widestring::U16String;
@@ -42,7 +44,7 @@ use winapi::um::unknwnbase::IUnknown;
 use bstr::BStringExt;
 use ptr::Ptr;
 use types::{Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool};
-use variant::{Variant, VariantType};
+use variant::{Variant, VariantExt};
 
 pub trait SafeArrayElement: Sized {
     const VARTYPE: u32;
@@ -51,40 +53,71 @@ pub trait SafeArrayElement: Sized {
     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self, i32>;
 }
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct SafeArray<T: SafeArrayElement> {
-    array: Vec<T>
+pub trait SafeArrayExt<T: SafeArrayElement> {
+    fn into_safearray(&mut self) -> Result<Ptr<SAFEARRAY>, ()>;
+    fn from_safearray(psa: *mut SAFEARRAY) -> Result<Vec<T>, i32>;
 }
 
-#[allow(dead_code)]
-impl<T: SafeArrayElement> SafeArray<T> {
-    pub fn new(arr: Vec<T>) -> SafeArray<T> {
-        SafeArray { array: arr }
-    }
 
-    pub fn unwrap(self) -> Vec<T> {
-        self.array
-    }
+struct SafeArrayDestructor {
+    inner: *mut SAFEARRAY, 
+    _marker: PhantomData<SAFEARRAY>
+}
 
-    pub fn into_safearray(&mut self) -> Result<Ptr<SAFEARRAY>, ()> {
-        let c_elements: ULONG = self.array.len() as u32;
+impl SafeArrayDestructor {
+    fn new(p: *mut SAFEARRAY) -> SafeArrayDestructor {
+        assert!(!p.is_null());
+        SafeArrayDestructor{
+            inner: p, 
+            _marker: PhantomData
+        }
+    }
+}
+
+impl Drop for SafeArrayDestructor {
+    fn drop(&mut self)  {
+        if self.inner.is_null(){
+            return;
+        }
+        unsafe {
+            SafeArrayDestroy(self.inner)
+        };
+        self.inner = null_mut();
+    }
+}
+
+
+impl<T: SafeArrayElement> SafeArrayExt<T> for Vec<T> {
+    fn into_safearray(&mut self) -> Result<Ptr<SAFEARRAY>, ()> {
+        let c_elements: ULONG = self.len() as u32;
         let vartype = T::VARTYPE;
         let mut sab = SAFEARRAYBOUND { cElements: c_elements, lLbound: 0i32};
         let psa = unsafe { SafeArrayCreate(vartype as u16, 1, &mut sab)};
+        let mut sad = SafeArrayDestructor::new(psa);
 
-        for (ix, mut elem) in self.array.iter_mut().enumerate() {
+        for (ix, mut elem) in self.iter_mut().enumerate() {
             match elem.into_safearray(psa, ix as i32) {
                 Ok(()) => continue, 
                 Err(_) => return Err(())
             }
         }
+        sad.inner = null_mut();
 
         Ok(Ptr::with_checked(psa).unwrap())
     }
 
-    pub fn from_safearray(psa: *mut SAFEARRAY) -> Result<SafeArray<T>, i32> {
+    fn from_safearray(psa: *mut SAFEARRAY) -> Result<Vec<T>, i32> {
+        //Stack sentinel to ensure safearray is released even if there is a panic or early return.
+        let _sad = SafeArrayDestructor::new(psa);
         let sa_dims = unsafe { SafeArrayGetDim(psa) };
         assert!(sa_dims > 0); //Assert its not a dimensionless safe array
+        let vt = unsafe {
+            let mut vt: VARTYPE = 0;
+            let _hr = SafeArrayGetVartype(psa, &mut vt);
+            vt
+        };
+        assert!(vt as u32 == T::VARTYPE);
+
         if sa_dims == 1 {
             let (l_bound, r_bound) = unsafe {
                 let mut l_bound: c_long = 0;
@@ -101,12 +134,12 @@ impl<T: SafeArrayElement> SafeArray<T> {
                     Err(hr) => return Err(hr)
                 }
             }
-            Ok(SafeArray::new(vc))
+            Ok(vc)
         } else {
             panic!("Multiple dimension arrays not yet supported.")
         }
     }
-}
+} 
 
 macro_rules! safe_arr_impl {
     (
@@ -139,14 +172,16 @@ macro_rules! safe_arr_impl {
 
 safe_arr_impl!{impl SafeArrayElement for i16 {
     SFTYPE = VT_I2;
-    from => {|psa, ix| {
-        let mut i = 0i16;
-        let hr = SafeArrayGetElement(psa, &ix, &mut i as *mut _ as *mut c_void);
-        (hr, i)
-    }}
+    from => {
+        |psa, ix| {
+            let mut i = 0i16;
+            let hr = SafeArrayGetElement(psa, &ix, &mut i as *mut _ as *mut c_void);
+            (hr, i)
+        }
+    }
     into => {
         |slf, psa, ix| {
-            SafeArrayGetElement(psa, &ix, slf as *mut _ as *mut c_void)
+            SafeArrayPutElement(psa, &ix, slf as *mut _ as *mut c_void)
         }
     }
 }}
@@ -293,7 +328,7 @@ safe_arr_impl!{impl SafeArrayElement for bool {
         }
     }
 }}
-safe_arr_impl!{impl <T: VariantType> SafeArrayElement for Variant<T> {
+safe_arr_impl!{impl <T: VariantExt> SafeArrayElement for Variant<T> {
     SFTYPE = VT_VARIANT;
     from => {|psa, ix| {
         let mut pvar: *mut VARIANT = null_mut();
@@ -475,23 +510,38 @@ extern "system" {
     pub fn SafeArrayPutElement(psa: LPSAFEARRAY, rgIndices: *const c_long, pv: *mut c_void) -> HRESULT;
 }
 
-
-
 #[cfg(test)]
 mod test {
     use super::*;
-    #[test]
-    fn test_create() {
-        let v: Vec<i8> = vec![0,1,2,3,4];
-        println!("{:?}", v);
-        let mut sa = SafeArray::new(v);
-        let p = sa.into_safearray().unwrap();
-        println!("{:p}", p.as_ptr());
+    macro_rules! validate_safe_arr {
+        ($t:ident, $vals:expr, $vt:expr) => {
+            let mut v: Vec<$t> = $vals;
 
-        let r = SafeArray::<i8>::from_safearray(p.as_ptr());
-        let r = r.unwrap().unwrap();
-        println!("{:?}", r);
-        assert_eq!(r, vec![0,1,2,3,4] );
+            let p = v.into_safearray().unwrap();
+            
+            let r = Vec::<$t>::from_safearray(p.as_ptr());
+            let r = r.unwrap();
+            assert_eq!(r, $vals);
+        };
     }
-
+    #[test]
+    fn test_i16() {
+        validate_safe_arr!(i16, vec![0,1,2,3,4], VT_I2 );
+    }
+    #[test]
+    fn test_i32() {
+        validate_safe_arr!(i32, vec![0,1,2,3,4], VT_I4 );
+    }
+    #[test]
+    fn test_f32() {
+        validate_safe_arr!(f32, vec![0.0f32,-1.333f32,2f32,3f32,4f32], VT_R4 );
+    }
+    #[test]
+    fn test_cy() {
+        validate_safe_arr!(Currency, vec![Currency(-1), Currency(2)], VT_CY );
+    }
+    #[test]
+    fn test_date() {
+        validate_safe_arr!(Date, vec![Date(0.01), Date(100.0/99.0)], VT_DATE );
+    }
 }

@@ -8,7 +8,7 @@
 
 use rust_decimal::Decimal;
 
-use winapi::shared::wtypes::{CY, DATE, DECIMAL, DECIMAL_NEG, VARIANT_BOOL};
+use winapi::shared::wtypes::{CY, DATE, DECIMAL, DECIMAL_NEG, VARIANT_BOOL, VARIANT_TRUE};
 
 #[derive(Clone, Copy, Debug, Eq,  Hash, PartialOrd, PartialEq)]
 pub struct Currency(pub i64);
@@ -230,24 +230,22 @@ impl<'d> From<&'d mut Decimal> for DecWrapper {
     }
 }
 
-
-
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct VariantBool(bool);
 
 impl From<VariantBool> for VARIANT_BOOL {
     fn from(vb: VariantBool) -> VARIANT_BOOL {
-        if vb.0 {-1} else {0}
+        if vb.0 {VARIANT_TRUE} else {0}
     }
 }
 impl<'v> From<&'v VariantBool> for VARIANT_BOOL {
     fn from(vb: &VariantBool) -> VARIANT_BOOL {
-        if vb.0 {-1} else {0}
+        if vb.0 {VARIANT_TRUE} else {0}
     }
 }
 impl<'v> From<&'v mut VariantBool> for VARIANT_BOOL {
     fn from(vb: &mut VariantBool) -> VARIANT_BOOL {
-        if vb.0 {-1} else {0}
+        if vb.0 {VARIANT_TRUE} else {0}
     }
 }
 
@@ -340,5 +338,16 @@ mod tests {
         //println!("{:?}", new_d.serialize());
        // assert_eq!(new_d.is_sign_positive(), true);
         assert_eq!(format!("{}", new_d), "1208925819333149903028225"  );
+    }
+
+    #[test]
+    fn variant_bool() {
+        let vb = VariantBool::from(true);
+        let pvb = VARIANT_BOOL::from(vb);
+        assert_eq!(VARIANT_TRUE, pvb);
+
+        let vb = VariantBool::from(false);
+        let pvb = VARIANT_BOOL::from(vb);
+        assert_ne!(VARIANT_TRUE, pvb);
     }
 }
