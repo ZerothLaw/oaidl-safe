@@ -1,9 +1,16 @@
 use std::fmt;
 use std::ptr::NonNull;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialOrd, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialOrd, PartialEq)]
 pub struct Ptr<T> {
     inner: NonNull<T>
+}
+
+impl<T: Copy> Copy for Ptr<T> {}
+impl<T: Clone> Clone for Ptr<T> {
+    fn clone(&self) -> Self {
+        Ptr {inner: self.inner.clone()}
+    }
 }
 
 #[allow(dead_code)]
@@ -38,3 +45,26 @@ impl<T> fmt::Pointer for Ptr<T> {
     }
 }
 
+impl<T> From<NonNull<T>> for Ptr<T> {
+    fn from(nn: NonNull<T>) -> Self {
+        Ptr::new(nn)
+    }
+}
+
+impl<T> Into<NonNull<T>> for Ptr<T> {
+    fn into(self) -> NonNull<T> {
+        self.inner
+    }
+}
+
+impl<T> AsRef<T> for Ptr<T> {
+    fn as_ref(&self) -> &T {
+        unsafe {self.as_ref()}
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    
+}

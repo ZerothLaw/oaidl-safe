@@ -10,6 +10,7 @@ use rust_decimal::Decimal;
 
 use winapi::shared::wtypes::{CY, DATE, DECIMAL, DECIMAL_NEG, VARIANT_BOOL, VARIANT_TRUE};
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, Debug, Eq,  Hash, PartialOrd, PartialEq)]
 pub struct Currency(pub i64);
 
@@ -61,6 +62,13 @@ impl<'c> From<&'c mut Currency> for CY {
     }
 }
 
+impl AsRef<i64> for Currency {
+    fn as_ref(&self) -> &i64 {
+        &self.0
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Date(pub f64); //DATE <--> F64
 
@@ -98,6 +106,13 @@ impl<'f> From<&'f mut Date> for DATE {
     }
 }
 
+impl AsRef<f64> for Date {
+    fn as_ref(&self) -> &f64 {
+        &self.0
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DecWrapper(Decimal);
 
@@ -230,6 +245,13 @@ impl<'d> From<&'d mut Decimal> for DecWrapper {
     }
 }
 
+impl AsRef<Decimal> for DecWrapper {
+    fn as_ref(&self) -> &Decimal {
+        &self.0
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct VariantBool(bool);
 
@@ -299,12 +321,40 @@ impl<'v> From<&'v mut VariantBool> for bool {
     }
 }
 
+impl AsRef<bool> for VariantBool {
+    fn as_ref(&self) -> &bool {
+        &self.0
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Int(pub i32);
+
+impl AsRef<i32> for Int {
+    fn as_ref(&self) -> &i32 {
+        &self.0
+    }
+}
+
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct UInt(pub u32);
+
+impl AsRef<u32> for UInt {
+    fn as_ref(&self) -> &u32 {
+        &self.0
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SCode(pub i32);
+
+impl AsRef<i32> for SCode {
+    fn as_ref(&self) -> &i32 {
+        &self.0
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -349,5 +399,29 @@ mod tests {
         let vb = VariantBool::from(false);
         let pvb = VARIANT_BOOL::from(vb);
         assert_ne!(VARIANT_TRUE, pvb);
+    }
+
+    #[test]
+    fn test_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Currency>();
+        assert_send::<Date>();
+        assert_send::<DecWrapper>();
+        assert_send::<Int>();
+        assert_send::<SCode>();
+        assert_send::<UInt>();
+        assert_send::<VariantBool>();
+    }
+
+    #[test]
+    fn test_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Currency>();
+        assert_sync::<Date>();
+        assert_sync::<DecWrapper>();
+        assert_sync::<Int>();
+        assert_sync::<SCode>();
+        assert_sync::<UInt>();
+        assert_sync::<VariantBool>();
     }
 }

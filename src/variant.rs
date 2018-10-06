@@ -118,8 +118,9 @@
 *  VT_BYREF            [V]           void* for local use
 *  VT_BSTR_BLOB                      Reserved for system use
 */
+use std::marker::PhantomData;
 use std::mem;
-use std::ptr::NonNull;
+use std::ptr::{NonNull, null_mut};
 
 use rust_decimal::Decimal;
 
@@ -225,11 +226,47 @@ impl<T: VariantExt> Variant<T> {
     }
 }
 
+impl<T: VariantExt> AsRef<T> for Variant<T> {
+    fn as_ref(&self) -> &T {
+        self.borrow()
+    }
+}
+
+impl<T: VariantExt> AsMut<T> for Variant<T> {
+    fn as_mut(&mut self) -> &mut T {
+        self.borrow_mut()
+    }
+}
+
+struct VariantDestructor {
+    inner: *mut VARIANT, 
+    _marker: PhantomData<VARIANT>
+}
+
+impl VariantDestructor {
+    fn new(p: *mut VARIANT) -> VariantDestructor {
+        VariantDestructor {
+            inner: p, 
+            _marker: PhantomData
+        }
+    }
+}
+
+impl Drop for VariantDestructor {
+    fn drop(&mut self) {
+        if self.inner.is_null() {
+            return;
+        }
+        unsafe { VariantClear(self.inner)};
+        self.inner = null_mut();
+    }
+}
+
 macro_rules! variant_impl {
     (
         impl $(<$tn:ident : $tc:ident>)* VariantExt for $t:ty {
-            VARTYPE = $vt:expr;
-            n3, $un_n:ident, $un_n_mut:ident
+            VARTYPE = $vt:expr ;
+            $n_name:ident, $un_n:ident, $un_n_mut:ident
             from => {$from:expr}
             into => {$into:expr}
         }
@@ -237,29 +274,25 @@ macro_rules! variant_impl {
         impl $(<$tn: $tc>)* VariantExt for $t {
             const VARTYPE: u32 = $vt;
             fn from_variant(var: Ptr<VARIANT>) -> Result<Self, ()>{
-                let mut var = unsafe {*var.as_ptr()};
-                let mut n1 = var.n1;
+                let var = var.as_ptr();
+                let mut var_d = VariantDestructor::new(var);
 
-                let n3 = unsafe {
-                    n1.n2_mut().n3
-                };
-                let ret = unsafe {
-                    let n_ptr = n3.$un_n();
-                    $from(n_ptr)
-                };
-                unsafe {
-                    VariantClear(&mut var)
-                };
+                #[allow(unused_mut)]
+                let mut n1 = unsafe {(*var).n1};
+                if unsafe{n1.n2()}.vt as u32 != Self::VARTYPE {
+                    //
+                }
+                let ret = variant_impl!(@write $n_name, $un_n, $from, n1);
+
+                var_d.inner = null_mut();
                 ret
             }
 
             fn into_variant(&mut self) -> Result<Ptr<VARIANT>, ()> {
+                #[allow(unused_mut)]
                 let mut n3: VARIANT_n3 = unsafe {mem::zeroed()};
                 let mut n1: VARIANT_n1 = unsafe {mem::zeroed()};
-                unsafe {
-                    let n_ptr = n3.$un_n_mut();
-                    *n_ptr = $into(self)
-                }
+                variant_impl!(@read $n_name, $un_n_mut, $into, n3, n1, self);
                 let tv = __tagVARIANT { vt: <Self as VariantExt>::VARTYPE as u16, 
                                 wReserved1: 0, 
                                 wReserved2: 0, 
@@ -274,49 +307,35 @@ macro_rules! variant_impl {
             }
         }
     };
-
-    (
-        impl $(<$tn:ident : $tc:ident>)* VariantExt for $t:ty {
-            VARTYPE = $vt:expr;
-            n1, $un_n:ident, $un_n_mut:ident
-            from => {$from:expr}
-            into => {$into:expr}
+    (@write n3, $un_n:ident, $from:expr, $n1:ident) => {
+        {
+            let n3 = unsafe { $n1.n2_mut().n3 };
+            let ret = unsafe {
+                let n_ptr = n3.$un_n();
+                $from(n_ptr)
+            };
+            ret 
         }
-    ) => {
-        impl $(<$tn: $tc>)* VariantExt for $t {
-            const VARTYPE: u32 = $vt;
-            fn from_variant(var: Ptr<VARIANT>) -> Result<Self, ()>{
-                let mut var = unsafe {*var.as_ptr()};
-                let n1 = var.n1;
-                let ret = unsafe {
-                    let n_ptr = n1.$un_n();
-                    $from(n_ptr)
-                };
-                unsafe {
-                    VariantClear(&mut var)
-                };
-                ret
-            }
-
-           fn into_variant(&mut self) -> Result<Ptr<VARIANT>, ()> {
-                let n3: VARIANT_n3 = unsafe {mem::zeroed()};
-                let mut n1: VARIANT_n1 = unsafe {mem::zeroed()};
-                unsafe {
-                    let n_ptr = n1.$un_n_mut();
-                    *n_ptr = $into(self)
-                }
-                let tv = __tagVARIANT { vt: <Self as VariantExt>::VARTYPE as u16, 
-                                wReserved1: 0, 
-                                wReserved2: 0, 
-                                wReserved3: 0, 
-                                n3: n3};
-                unsafe {
-                    let n_ptr = n1.n2_mut();
-                    *n_ptr = tv;
-                };
-                let var = Box::new(VARIANT{ n1: n1 });
-                Ok(Ptr::with_checked(Box::into_raw(var)).unwrap())
-            }
+    };
+    (@write n1, $un_n:ident, $from:expr, $n1:ident) => {
+        {
+            let ret = unsafe {
+                let n_ptr = $n1.$un_n();
+                $from(n_ptr)
+            };
+            ret
+        }
+    };
+    (@read n3, $un_n_mut:ident, $into:expr, $n3:ident, $n1:ident, $slf:expr) => {
+        unsafe {
+            let n_ptr = $n3.$un_n_mut();
+            *n_ptr = $into($slf)
+        }
+    };
+    (@read n1, $un_n_mut:ident, $into:expr, $n3:ident, $n1:ident, $slf:expr) => {
+        unsafe {
+            let n_ptr = $n1.$un_n_mut();
+            *n_ptr = $into($slf)
         }
     };
 }
@@ -427,7 +446,7 @@ variant_impl!{
     impl VariantExt for Ptr<IDispatch> {
         VARTYPE = VT_DISPATCH;
         n3, pdispVal, pdispVal_mut
-        from => {|n_ptr: &* mut IDispatch| Ok(Ptr::with_checked(*n_ptr).unwrap())}
+        from => {|n_ptr: &*mut IDispatch| Ok(Ptr::with_checked(*n_ptr).unwrap())}
         into => {|slf: &mut Ptr<IDispatch>| (*slf).as_ptr()}
     }
 }
@@ -569,8 +588,8 @@ variant_impl! {
         n3, ppdispVal, ppdispVal_mut
         from => {
             |n_ptr: &*mut *mut IDispatch| {
-                match NonNull::new((**n_ptr).clone()) {
-                    Some(nn) => Ok(Box::new(Ptr::new(nn))), 
+                match Ptr::with_checked((**n_ptr).clone()) {
+                    Some(nn) => Ok(Box::new(nn)), 
                     None => Err(())
                 }
             }
@@ -588,8 +607,8 @@ variant_impl!{
         VARTYPE = VT_VARIANT;
         n3, pvarVal, pvarVal_mut
         from => {|n_ptr: &*mut VARIANT| {
-            let pnn = match NonNull::new(*n_ptr) {
-                Some(nn) => Ptr::new(nn), 
+            let pnn = match Ptr::with_checked(*n_ptr) {
+                Some(nn) => nn, 
                 None => return Err(()) 
             };
             Variant::<T>::from_variant(pnn)
@@ -912,5 +931,17 @@ mod test {
     #[test]
     fn test_u64() {
         validate_variant!(u64, 11976u64, VT_UI8);
+    }
+
+    #[test]
+    fn test_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Variant<i64>>();
+    }
+
+    #[test]
+    fn test_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Variant<i64>>();
     }
 }
