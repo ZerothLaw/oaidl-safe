@@ -1,12 +1,12 @@
 //SafeArrayElement 
 //  into_safearray
 //  from_safearray
-
+#[derive(Debug)]
 pub enum ElementError {
     From(FromSafeArrElemError),
     Into(IntoSafeArrElemError), 
 }
-
+#[derive(Debug)]
 pub enum FromSafeArrElemError {
     GetElementFailed { hr: i32 },
     VariantPtrNull, 
@@ -14,7 +14,7 @@ pub enum FromSafeArrElemError {
     UnknownPtrNull,
     DispatchPtrNull,
 }
-
+#[derive(Debug)]
 pub enum IntoSafeArrElemError {
     BStringAllocFailed{len: usize},
     VariantAllocFailed{vartype: u32},
@@ -36,12 +36,12 @@ impl From<IntoSafeArrElemError> for ElementError {
 //SafeArrayExt
 //  into_safearray
 //  from_safearray
-
+#[derive(Debug)]
 pub enum SafeArrayError {
     From(FromSafeArrayError),
     Into(IntoSafeArrayError), 
 }
-
+#[derive(Debug)]
 pub enum FromSafeArrayError{
     SafeArrayDimsInvalid {sa_dims: u32},
     VarTypeDoesNotMatch {expected: u32, found: u32},
@@ -53,7 +53,7 @@ pub enum FromSafeArrayError{
         element: ElementError
     }
 }
-
+#[derive(Debug)]
 pub enum IntoSafeArrayError {
     ElementConversionFailed {
         index: usize, 
@@ -74,6 +74,17 @@ impl From<IntoSafeArrayError> for SafeArrayError {
     }
 }
 
+impl FromSafeArrayError {
+    pub fn from_element_err<E: Into<ElementError>>(ee: E, index: usize) -> FromSafeArrayError {
+        FromSafeArrayError::ElementConversionFailed{index: index, element: ee.into()}
+    }
+}
+
+impl IntoSafeArrayError {
+    pub fn from_element_err<E: Into<ElementError>>(ee: E, index: usize) -> IntoSafeArrayError {
+        IntoSafeArrayError::ElementConversionFailed{index: index, element: ee.into()}
+    }
+}
 
 //impl <T: VariantExt> SafeArrayElement for Variant<T> 
 //can fail on invalid pointer
@@ -81,7 +92,7 @@ impl From<IntoSafeArrayError> for SafeArrayError {
 //BStringExt
 //  allocate_bstr
 //  allocate_managed_bstr
-
+#[derive(Debug)]
 pub enum BStringError {
     AllocateFailed {len: usize},    
 }
@@ -89,12 +100,12 @@ pub enum BStringError {
 //VariantExt
 //  from_variant
 //  into_variant
-
+#[derive(Debug)]
 pub enum VariantError {
     From(FromVariantError), 
     Into(IntoVariantError),
 }
-
+#[derive(Debug)]
 pub enum FromVariantError {
     VarTypeDoesNotMatch { expected: u32, found: u32 },
     AllocBStr(BStringError),
@@ -104,7 +115,7 @@ pub enum FromVariantError {
     ArrayPtrNull, 
     CVoidPtrNull,
 }
-
+#[derive(Debug)]
 pub enum IntoVariantError {
     AllocBStrFailed(BStringError),
     SafeArrConvFailed(SafeArrayError),

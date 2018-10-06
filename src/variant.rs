@@ -939,6 +939,7 @@ mod test {
         assert_send::<Variant<i64>>();
     }
 
+
     #[test]
     fn test_sync() {
         fn assert_sync<T: Sync>() {}
