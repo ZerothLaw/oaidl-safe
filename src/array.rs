@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::mem;
 use std::ptr::{NonNull, null_mut};
 
 use rust_decimal::Decimal;
@@ -160,6 +161,30 @@ macro_rules! safe_arr_impl {
     (
         impl $(< $tn:ident : $tc:ident >)* SafeArrayElement for $t:ty {
             SFTYPE = $vt:expr;
+            ptr
+            def  => {$def:expr}
+            from => {$from:expr}
+            into => {$into:expr}
+        }
+    ) => {
+        impl $(<$tn:$tc>)* SafeArrayElement for $t {
+            const SFTYPE: u32 = $vt;
+             fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self, FromSafeArrElemError> {
+                let val = $def;
+                let hr = unsafe {SafeArrayGetElement(psa, &ix, val as *mut _ as *mut c_void)};
+                check_and_throw!(hr, $from(val), {return Err(FromSafeArrElemError::GetElementFailed{hr: hr})})
+            }
+            
+            fn into_safearray(&mut self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), IntoSafeArrElemError> {
+                let slf = $into(self);
+                let hr = unsafe {SafeArrayPutElement(psa, &ix, slf as *mut _ as *mut c_void)};
+                check_and_throw!(hr, {return Ok(())}, {Err(IntoSafeArrElemError::PutElementFailed{hr: hr})})
+            }
+        }
+    };
+    (
+        impl $(< $tn:ident : $tc:ident >)* SafeArrayElement for $t:ty {
+            SFTYPE = $vt:expr;
             def  => {$def:expr}
             from => {$from:expr}
             into => {$into:expr}
@@ -234,7 +259,11 @@ safe_arr_impl!{impl SafeArrayElement for String {
 }}
 safe_arr_impl!{impl SafeArrayElement for Ptr<IDispatch>{
     SFTYPE = VT_DISPATCH; 
-    def => {null_mut()}
+    ptr
+    def => {{
+        let mut var: IDispatch = unsafe {mem::zeroed()};
+        &mut var as *mut IDispatch
+    }}
     from => { |ptr: *mut IDispatch| {
         match Ptr::with_checked(ptr) {
             Some(pnn) => Ok(pnn), 
@@ -259,7 +288,11 @@ safe_arr_impl!{impl SafeArrayElement for bool {
 }}
 safe_arr_impl!{impl <T: VariantExt> SafeArrayElement for Variant<T> {
     SFTYPE = VT_VARIANT;
-    def => {null_mut()}
+    ptr
+    def => {{
+        let mut var: VARIANT = unsafe {mem::zeroed()};
+        &mut var as *mut VARIANT
+    }}
     from => {|pvar| {
         let pnn = match Ptr::with_checked(pvar) {
             Some(nn) => nn, 
@@ -271,15 +304,9 @@ safe_arr_impl!{impl <T: VariantExt> SafeArrayElement for Variant<T> {
         }
     }}
     into => {|slf: &mut Variant<T>|{
-        match slf.to_variant() {
+        match slf.into_variant() {
             Ok(slf) => {
                 let mut s = slf.as_ptr();
-                println!("{:p}", s);
-                let s2 = &mut s as *mut *mut VARIANT;
-                println!("{:p}", s2);
-                let s3 = s2 as *mut _ as *mut c_void;
-                println!("{:p}", s3);
-                //*mut VARIANT => mut *mut VARIANT => &mut *mut VARIANT => *mut _ => *mut c_void
                 s
             }, 
             Err(()) => panic!("Could not alloc variant")
@@ -288,7 +315,11 @@ safe_arr_impl!{impl <T: VariantExt> SafeArrayElement for Variant<T> {
 }}
 safe_arr_impl!{impl SafeArrayElement for Ptr<IUnknown> {
     SFTYPE = VT_UNKNOWN; 
-    def => {null_mut()}
+    ptr
+    def => {{
+        let mut var: IUnknown = unsafe {mem::zeroed()};
+        &mut var as *mut IUnknown
+    }}
     from => {
         |ptr| {
             match Ptr::with_checked(ptr) {

@@ -216,12 +216,48 @@ impl<T: VariantExt> Variant<T> {
         &mut self.0
     }
 
-    pub fn to_variant(&mut self) -> Result<Ptr<VARIANT>, ()> {
-        self.0.into_variant()        
+    pub fn into_variant(&mut self) -> Result<Ptr<VARIANT>, ()> {
+        #[allow(unused_mut)]
+        let mut n3: VARIANT_n3 = unsafe {mem::zeroed()};
+        let mut n1: VARIANT_n1 = unsafe {mem::zeroed()};
+        let var = self.0.into_variant()?;
+        let var = var.as_ptr();
+        unsafe {
+            let n_ptr = n3.pvarVal_mut();
+            *n_ptr = var;
+        };
+
+        let tv = __tagVARIANT { vt: <Self as VariantExt>::VARTYPE as u16, 
+                        wReserved1: 0, 
+                        wReserved2: 0, 
+                        wReserved3: 0, 
+                        n3: n3};
+        unsafe {
+            let n_ptr = n1.n2_mut();
+            *n_ptr = tv;
+        };
+        let var = Box::new(VARIANT{ n1: n1 });
+        Ok(Ptr::with_checked(Box::into_raw(var)).unwrap())
     }
 
     pub fn from_variant(var: Ptr<VARIANT>) -> Result<Variant<T>, ()> {
-        let t = T::from_variant(var).unwrap();
+        let var = var.as_ptr();
+        let mut var_d = VariantDestructor::new(var);
+
+        let mut n1 = unsafe {(*var).n1};
+        let n3 = unsafe { n1.n2_mut().n3 };
+        let n_ptr = unsafe {
+            let n_ptr = n3.pvarVal();
+            *n_ptr
+        };
+
+        let pnn = match Ptr::with_checked(n_ptr) {
+            Some(nn) => nn, 
+            None => return Err(()) 
+        };
+    
+        let t = T::from_variant(pnn).unwrap();
+        var_d.inner = null_mut();
         Ok(Variant(t))
     }
 }
@@ -282,7 +318,7 @@ macro_rules! variant_impl {
                 if unsafe{n1.n2()}.vt as u32 != Self::VARTYPE {
                     //
                 }
-                let ret = variant_impl!(@write $n_name, $un_n, $from, n1);
+                let ret = variant_impl!(@read $n_name, $un_n, $from, n1);
 
                 var_d.inner = null_mut();
                 ret
@@ -292,7 +328,7 @@ macro_rules! variant_impl {
                 #[allow(unused_mut)]
                 let mut n3: VARIANT_n3 = unsafe {mem::zeroed()};
                 let mut n1: VARIANT_n1 = unsafe {mem::zeroed()};
-                variant_impl!(@read $n_name, $un_n_mut, $into, n3, n1, self);
+                variant_impl!(@write $n_name, $un_n_mut, $into, n3, n1, self);
                 let tv = __tagVARIANT { vt: <Self as VariantExt>::VARTYPE as u16, 
                                 wReserved1: 0, 
                                 wReserved2: 0, 
@@ -307,7 +343,7 @@ macro_rules! variant_impl {
             }
         }
     };
-    (@write n3, $un_n:ident, $from:expr, $n1:ident) => {
+    (@read n3, $un_n:ident, $from:expr, $n1:ident) => {
         {
             let n3 = unsafe { $n1.n2_mut().n3 };
             let ret = unsafe {
@@ -317,7 +353,7 @@ macro_rules! variant_impl {
             ret 
         }
     };
-    (@write n1, $un_n:ident, $from:expr, $n1:ident) => {
+    (@read n1, $un_n:ident, $from:expr, $n1:ident) => {
         {
             let ret = unsafe {
                 let n_ptr = $n1.$un_n();
@@ -326,13 +362,13 @@ macro_rules! variant_impl {
             ret
         }
     };
-    (@read n3, $un_n_mut:ident, $into:expr, $n3:ident, $n1:ident, $slf:expr) => {
+    (@write n3, $un_n_mut:ident, $into:expr, $n3:ident, $n1:ident, $slf:expr) => {
         unsafe {
             let n_ptr = $n3.$un_n_mut();
             *n_ptr = $into($slf)
         }
     };
-    (@read n1, $un_n_mut:ident, $into:expr, $n3:ident, $n1:ident, $slf:expr) => {
+    (@write n1, $un_n_mut:ident, $into:expr, $n3:ident, $n1:ident, $slf:expr) => {
         unsafe {
             let n_ptr = $n1.$un_n_mut();
             *n_ptr = $into($slf)
@@ -931,6 +967,25 @@ mod test {
     #[test]
     fn test_u64() {
         validate_variant!(u64, 11976u64, VT_UI8);
+    }
+
+    #[test]
+    fn test_variant() {
+        let mut v = Variant::new(1000u64);
+        let var = match v.into_variant() {
+            Ok(var) => var, 
+            Err(()) => panic!("Error")
+        };
+        assert!(!var.as_ptr().is_null());
+        unsafe {
+            let pvar = var.as_ptr();
+            let n1 = (*pvar).n1;
+            let tv: &__tagVARIANT = n1.n2();
+            assert_eq!(tv.vt as u32, VT_VARIANT);
+        };
+        let var = Variant::<u64>::from_variant(var);
+        assert_eq!(v, var.unwrap());
+        
     }
 
     #[test]
