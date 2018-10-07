@@ -2,6 +2,8 @@ use std::ptr::null_mut;
 
 use winapi::um::oleauto::{SysAllocStringLen, SysFreeString, SysStringLen};
 use widestring::U16String;
+
+use errors::BStringError;
 use ptr::Ptr;
 
 // pub type wchar_t = u16;
@@ -13,8 +15,8 @@ use ptr::Ptr;
 pub type BSTR = *mut u16; 
 
 pub trait BStringExt {
-    fn allocate_bstr(self) -> Result<Ptr<u16>, ()>;
-    fn allocate_managed_bstr(self) -> Result<DroppableBString, ()>;
+    fn allocate_bstr(self) -> Result<Ptr<u16>, BStringError>;
+    fn allocate_managed_bstr(self) -> Result<DroppableBString, BStringError>;
     fn deallocate_bstr(bstr: Ptr<u16>);
     fn from_bstr(bstr: *mut u16) -> U16String;
     fn from_pbstr(bstr: Ptr<u16>) -> U16String;
@@ -22,17 +24,17 @@ pub trait BStringExt {
 }
 
 impl BStringExt for U16String {
-    fn allocate_bstr(self) -> Result<Ptr<u16>, ()> {
+    fn allocate_bstr(self) -> Result<Ptr<u16>, BStringError> {
         let sz = self.len();
         let rw = self.as_ptr();
         let bstr: BSTR = unsafe {SysAllocStringLen(rw, sz as u32)};
         match Ptr::with_checked(bstr) {
             Some(pbstr) => Ok(pbstr), 
-            None => Err(())
+            None => Err(BStringError::AllocateFailed{len: sz})
         }
     }
 
-    fn allocate_managed_bstr(self) -> Result<DroppableBString, ()> {
+    fn allocate_managed_bstr(self) -> Result<DroppableBString, BStringError> {
         Ok(DroppableBString{ inner: Some(self.allocate_bstr()?) })
     }
 
@@ -69,6 +71,7 @@ impl DroppableBString {
     /// consumed. It is your responsibility to manage the 
     /// memory yourself. Most uses of BSTR in FFI will
     /// free the memory for you. 
+    #[allow(dead_code)]
     pub fn consume(&mut self) -> *mut u16 {
         let ret = match self.inner {
             Some(ptr) => ptr.as_ptr(), 

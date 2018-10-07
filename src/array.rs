@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 use std::mem;
-use std::ptr::{NonNull, null_mut};
+use std::ptr::{null_mut};
 
 use rust_decimal::Decimal;
 
@@ -43,7 +43,12 @@ use winapi::um::oaidl::{IDispatch, LPSAFEARRAY, LPSAFEARRAYBOUND, SAFEARRAY, SAF
 use winapi::um::unknwnbase::IUnknown;
 
 use bstr::BStringExt;
-use errors::{ElementError, FromSafeArrayError, FromSafeArrElemError, IntoSafeArrayError, IntoSafeArrElemError, SafeArrayError};
+use errors::{
+    FromSafeArrayError, 
+    FromSafeArrElemError, 
+    IntoSafeArrayError, 
+    IntoSafeArrElemError,
+};
 use ptr::Ptr;
 use types::{Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool};
 use variant::{Variant, VariantExt};
@@ -176,7 +181,7 @@ macro_rules! safe_arr_impl {
             }
             
             fn into_safearray(&mut self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), IntoSafeArrElemError> {
-                let slf = $into(self);
+                let slf = $into(self)?;
                 let hr = unsafe {SafeArrayPutElement(psa, &ix, slf as *mut _ as *mut c_void)};
                 check_and_throw!(hr, {return Ok(())}, {Err(IntoSafeArrElemError::PutElementFailed{hr: hr})})
             }
@@ -199,7 +204,7 @@ macro_rules! safe_arr_impl {
             }
             
             fn into_safearray(&mut self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), IntoSafeArrElemError> {
-                let mut slf = $into(self);
+                let mut slf = $into(self)?;
                 let hr = unsafe {SafeArrayPutElement(psa, &ix, &mut slf as *mut _ as *mut c_void)};
                 check_and_throw!(hr, {return Ok(())}, {Err(IntoSafeArrElemError::PutElementFailed{hr: hr})})
             }
@@ -211,37 +216,37 @@ safe_arr_impl!{impl SafeArrayElement for i16 {
     SFTYPE = VT_I2;
     def => { 0i16 }
     from => {|i| Ok(i)}
-    into => { |slf: &mut _| *slf }
+    into => { |slf: &mut i16| -> Result<_, IntoSafeArrElemError> {Ok(*slf)} }
 }}
 safe_arr_impl!{impl SafeArrayElement for i32 {
     SFTYPE = VT_I4;
     def => { 0i32 }
     from => {|i| Ok(i)}
-    into => { |slf: &mut _| *slf }
+    into => { |slf: &mut _| -> Result<_, IntoSafeArrElemError> { Ok(*slf) }}
 }}
 safe_arr_impl!{impl SafeArrayElement for f32 {
     SFTYPE = VT_R4;
     def => { 0.0f32 }
     from => {|i| Ok(i)}
-    into => { |slf: &mut _| *slf }
+    into => { |slf: &mut _|-> Result<_, IntoSafeArrElemError> { Ok(*slf) }}
 }}
 safe_arr_impl!{impl SafeArrayElement for f64 { 
     SFTYPE = VT_R8; 
     def => { 0.0f64 }
     from => {|i| Ok(i)}
-    into => { |slf: &mut _| *slf }
+    into => { |slf: &mut _|-> Result<_, IntoSafeArrElemError> { Ok(*slf) }}
 }}
 safe_arr_impl!{impl SafeArrayElement for Currency{
     SFTYPE = VT_CY; 
     def => { CY{int64: 0} }
     from => { |cy| Ok(Currency::from(cy)) }
-    into => {|slf: &mut Currency| CY::from(*slf)}
+    into => {|slf: &mut Currency| -> Result<_, IntoSafeArrElemError> {Ok(CY::from(*slf))}}
 }}
 safe_arr_impl!{impl SafeArrayElement for Date{
     SFTYPE = VT_DATE; 
     def =>  { 0f64 as DATE }
     from => { |dt| Ok(Date::from(dt)) } 
-    into => { |slf: &mut Date| {DATE::from(*slf)} }
+    into => { |slf: &mut Date| -> Result<_, IntoSafeArrElemError> {Ok(DATE::from(*slf)) }}
 }}
 // safe_arr_impl!(String => VT_BSTR);
 safe_arr_impl!{impl SafeArrayElement for String {
@@ -252,9 +257,9 @@ safe_arr_impl!{impl SafeArrayElement for String {
         let bstr = U16String::from_str(slf);
         let bstr = match bstr.allocate_bstr() {
             Ok(bstr) => bstr, 
-            Err(()) => panic!("Nope"),
+            Err(ex) => return Err(ex)
         };
-        bstr.as_ptr()
+        Ok(bstr.as_ptr())
     }}
 }}
 safe_arr_impl!{impl SafeArrayElement for Ptr<IDispatch>{
@@ -270,20 +275,20 @@ safe_arr_impl!{impl SafeArrayElement for Ptr<IDispatch>{
             None => Err(FromSafeArrElemError::DispatchPtrNull)
         }
     }}
-    into => { |slf: &mut Ptr<IDispatch>| (*slf).as_ptr() }
+    into => { |slf: &mut Ptr<IDispatch>| -> Result<*mut IDispatch, IntoSafeArrElemError> {Ok((*slf).as_ptr()) }}
 }}
 safe_arr_impl!{impl SafeArrayElement for SCode {
     SFTYPE = VT_ERROR;
     def => {0 as SCODE}
     from => {|sc| Ok(SCode(sc))}
-    into => { |slf: &mut SCode| slf.0 }
+    into => { |slf: &mut SCode| -> Result<_, IntoSafeArrElemError> {Ok(slf.0) }}
 }}
 safe_arr_impl!{impl SafeArrayElement for bool {
     SFTYPE = VT_BOOL; 
     def => {0 as VARIANT_BOOL}
     from => {|vb| Ok(bool::from(VariantBool::from(vb)))} 
     into => {
-        |slf: &mut bool|  VARIANT_BOOL::from(VariantBool::from(*slf))
+        |slf: &mut bool| -> Result<_, IntoSafeArrElemError> { Ok(VARIANT_BOOL::from(VariantBool::from(*slf)))}
     }
 }}
 safe_arr_impl!{impl <T: VariantExt> SafeArrayElement for Variant<T> {
@@ -303,13 +308,13 @@ safe_arr_impl!{impl <T: VariantExt> SafeArrayElement for Variant<T> {
             Err(_) => Err(FromSafeArrElemError::FromVariantFailed)
         }
     }}
-    into => {|slf: &mut Variant<T>|{
+    into => {|slf: &mut Variant<T>| -> Result<*mut VARIANT, IntoSafeArrElemError>{
         match slf.into_variant() {
             Ok(slf) => {
                 let mut s = slf.as_ptr();
-                s
+                Ok(s)
             }, 
-            Err(()) => panic!("Could not alloc variant")
+            Err(ive) => Err(IntoSafeArrElemError::from(ive))
         }
     }}
 }}
@@ -329,8 +334,8 @@ safe_arr_impl!{impl SafeArrayElement for Ptr<IUnknown> {
         }
     }
     into => {
-        |slf: &mut Ptr<IUnknown>| {
-            (*slf).as_ptr()
+        |slf: &mut Ptr<IUnknown>| -> Result<*mut IUnknown, IntoSafeArrElemError> {
+            Ok((*slf).as_ptr())
         }
     }
 }}
@@ -339,51 +344,51 @@ safe_arr_impl!{impl SafeArrayElement for Decimal {
     def => {DECIMAL::from(DecWrapper::from(Decimal::new(0, 0)))}
     from => {|dec| Ok(Decimal::from(DecWrapper::from(dec)))}
     into => {
-        |slf: &mut Decimal| DECIMAL::from(DecWrapper::from(*slf))
+        |slf: &mut Decimal| -> Result<_, IntoSafeArrElemError> {Ok(DECIMAL::from(DecWrapper::from(*slf)))}
     }
 }}
 safe_arr_impl!{impl SafeArrayElement for DecWrapper { 
     SFTYPE = VT_DECIMAL; 
     def => {DECIMAL::from(DecWrapper::from(Decimal::new(0, 0)))}
     from => {|dec|Ok(DecWrapper::from(dec))} 
-    into => { |slf: &mut DecWrapper| DECIMAL::from(slf) }
+    into => { |slf: &mut DecWrapper| -> Result<_, IntoSafeArrElemError> { Ok(DECIMAL::from(slf)) }}
 }}
 //VT_RECORD
 safe_arr_impl!{impl SafeArrayElement for i8 {
     SFTYPE = VT_I1;
     def => { 0i8 }
     from => {|i| Ok(i)}
-    into => { |slf: &mut _| *slf }
+    into => { |slf: &mut _| -> Result<_, IntoSafeArrElemError> {Ok(*slf) }}
 }}
 safe_arr_impl!{impl SafeArrayElement for u8 {
     SFTYPE = VT_UI1;
     def => { 0u8}
     from => {|i| Ok(i)}
-    into => { |slf: &mut _| *slf }
+    into => { |slf: &mut _| -> Result<_, IntoSafeArrElemError> {Ok(*slf) }}
 }}
 safe_arr_impl!{impl SafeArrayElement for u16 {
     SFTYPE = VT_UI2;
     def => { 0u16 }
     from => {|i| Ok(i)}
-    into => { |slf: &mut _| *slf }
+    into => { |slf: &mut _| -> Result<_, IntoSafeArrElemError> {Ok(*slf) }}
 }}
 safe_arr_impl!{impl SafeArrayElement for u32 {
     SFTYPE = VT_UI4;
     def => { 0u32 }
     from => {|i| Ok(i)}
-    into => { |slf: &mut _| *slf }
+    into => { |slf: &mut _| -> Result<_, IntoSafeArrElemError> {Ok(*slf) }}
 }}
 safe_arr_impl!{impl SafeArrayElement for Int {
     SFTYPE = VT_INT;
     def => { 0i32 }
     from => {|i| Ok(Int(i))}
-    into => { |slf: &mut Int| slf.0 }
+    into => { |slf: &mut Int| -> Result<_, IntoSafeArrElemError> {Ok(slf.0) }}
 }}
 safe_arr_impl!{impl SafeArrayElement for UInt {
     SFTYPE = VT_UINT;
     def => { 0u32 }
     from => {|i| Ok(UInt(i))}
-    into => { |slf: &mut UInt| slf.0 }
+    into => { |slf: &mut UInt| -> Result<_, IntoSafeArrElemError> {Ok(slf.0) }}
 }}
 
 #[allow(dead_code)]

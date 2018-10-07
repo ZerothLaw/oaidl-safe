@@ -3,8 +3,8 @@
 //  from_safearray
 #[derive(Debug)]
 pub enum ElementError {
-    From(FromSafeArrElemError),
-    Into(IntoSafeArrElemError), 
+    From(Box<FromSafeArrElemError>),
+    Into(Box<IntoSafeArrElemError>), 
 }
 #[derive(Debug)]
 pub enum FromSafeArrElemError {
@@ -18,18 +18,19 @@ pub enum FromSafeArrElemError {
 pub enum IntoSafeArrElemError {
     BStringAllocFailed{len: usize},
     VariantAllocFailed{vartype: u32},
-    PutElementFailed { hr: i32 }
+    PutElementFailed { hr: i32 }, 
+    IntoVariantError(Box<IntoVariantError>),
 }
 
 impl From<FromSafeArrElemError> for ElementError {
     fn from(fsaee: FromSafeArrElemError) -> ElementError {
-        ElementError::From(fsaee)
+        ElementError::From(Box::new(fsaee))
     }
 }
 
 impl From<IntoSafeArrElemError> for ElementError {
     fn from(isaee: IntoSafeArrElemError) -> ElementError {
-        ElementError::Into(isaee)
+        ElementError::Into(Box::new(isaee))
     }
 }
 
@@ -38,8 +39,8 @@ impl From<IntoSafeArrElemError> for ElementError {
 //  from_safearray
 #[derive(Debug)]
 pub enum SafeArrayError {
-    From(FromSafeArrayError),
-    Into(IntoSafeArrayError), 
+    From(Box<FromSafeArrayError>),
+    Into(Box<IntoSafeArrayError>), 
 }
 #[derive(Debug)]
 pub enum FromSafeArrayError{
@@ -50,39 +51,39 @@ pub enum FromSafeArrayError{
     SafeArrayGetVartypeFailed {hr: i32},
     ElementConversionFailed {
         index: usize, 
-        element: ElementError
+        element: Box<ElementError>
     }
 }
 #[derive(Debug)]
 pub enum IntoSafeArrayError {
     ElementConversionFailed {
         index: usize, 
-        element: ElementError
+        element: Box<ElementError>
     },
     SafeArrayCreateFailed,
 }
 
 impl From<FromSafeArrayError> for SafeArrayError {
     fn from(fsae: FromSafeArrayError) -> SafeArrayError {
-        SafeArrayError::From(fsae)
+        SafeArrayError::From(Box::new(fsae))
     }
 }
 
 impl From<IntoSafeArrayError> for SafeArrayError {
     fn from(isae: IntoSafeArrayError) -> SafeArrayError {
-        SafeArrayError::Into(isae)
+        SafeArrayError::Into(Box::new(isae))
     }
 }
 
 impl FromSafeArrayError {
     pub fn from_element_err<E: Into<ElementError>>(ee: E, index: usize) -> FromSafeArrayError {
-        FromSafeArrayError::ElementConversionFailed{index: index, element: ee.into()}
+        FromSafeArrayError::ElementConversionFailed{index: index, element: Box::new(ee.into())}
     }
 }
 
 impl IntoSafeArrayError {
     pub fn from_element_err<E: Into<ElementError>>(ee: E, index: usize) -> IntoSafeArrayError {
-        IntoSafeArrayError::ElementConversionFailed{index: index, element: ee.into()}
+        IntoSafeArrayError::ElementConversionFailed{index: index, element: Box::new(ee.into())}
     }
 }
 
@@ -97,14 +98,24 @@ pub enum BStringError {
     AllocateFailed {len: usize},    
 }
 
+impl From<BStringError> for IntoSafeArrElemError {
+    fn from(bse: BStringError) -> IntoSafeArrElemError {
+        match bse {
+            BStringError::AllocateFailed{len} =>  IntoSafeArrElemError::BStringAllocFailed{len: len}
+        }
+    }
+}
+
+impl From<BStringError> for IntoVariantError {
+    fn from(bse: BStringError) -> IntoVariantError {
+        IntoVariantError::AllocBStrFailed(bse)
+    }
+}
+
 //VariantExt
 //  from_variant
 //  into_variant
-#[derive(Debug)]
-pub enum VariantError {
-    From(FromVariantError), 
-    Into(IntoVariantError),
-}
+
 #[derive(Debug)]
 pub enum FromVariantError {
     VarTypeDoesNotMatch { expected: u32, found: u32 },
@@ -114,12 +125,32 @@ pub enum FromVariantError {
     VariantPtrNull,
     ArrayPtrNull, 
     CVoidPtrNull,
+    SafeArrConvFailed(Box<SafeArrayError>),
 }
 #[derive(Debug)]
 pub enum IntoVariantError {
     AllocBStrFailed(BStringError),
-    SafeArrConvFailed(SafeArrayError),
+    SafeArrConvFailed(Box<SafeArrayError>),
 }
+
+impl From<IntoVariantError> for IntoSafeArrElemError {
+    fn from(ive: IntoVariantError) -> IntoSafeArrElemError {
+        IntoSafeArrElemError::IntoVariantError(Box::new(ive))
+    }
+}
+
+impl<I: Into<SafeArrayError>> From<I> for FromVariantError {
+    fn from(i: I) -> FromVariantError {
+        FromVariantError::SafeArrConvFailed(Box::new(i.into()))
+    }
+}
+
+impl<I: Into<SafeArrayError>> From<I> for IntoVariantError {
+    fn from(i: I) -> IntoVariantError {
+        IntoVariantError::SafeArrConvFailed(Box::new(i.into()))
+    }
+}
+
 
 //Variant
 //  to_variant  
