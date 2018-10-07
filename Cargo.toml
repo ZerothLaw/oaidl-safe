@@ -8,6 +8,7 @@ authors = ["ZerothLaw <trinioler@gmail.com>"]
 rust_decimal = "0.10.1"
 widestring = "0.4.0"
 winapi = {version = "0.3.6", features = ["oaidl", "oleauto", "wtypes"]}
+failure = "0.1.2"
 
 # Optional packages 
 serde = {version = "1.0", optional = true, features = ["derive"]}

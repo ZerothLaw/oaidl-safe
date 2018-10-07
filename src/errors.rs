@@ -1,24 +1,37 @@
+
+
 //SafeArrayElement 
 //  into_safearray
 //  from_safearray
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum ElementError {
+    #[fail(display = "{}", _0)]
     From(Box<FromSafeArrElemError>),
+    #[fail(display = "{}", _0)]
     Into(Box<IntoSafeArrElemError>), 
 }
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum FromSafeArrElemError {
+    #[fail(display = "SafeArrayGetElement failed with HRESULT=0x{:x}", hr)]
     GetElementFailed { hr: i32 },
+    #[fail(display = "VARIANT pointer is null")]
     VariantPtrNull, 
+    #[fail(display = "conversion from variant failed")]
     FromVariantFailed, 
+    #[fail(display = "IUnknown pointer is null")]
     UnknownPtrNull,
+    #[fail(display = "IDispatch pointer is null")]
     DispatchPtrNull,
 }
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum IntoSafeArrElemError {
+    #[fail(display = "BSTR allocation failed for len: {}", len)]
     BStringAllocFailed{len: usize},
+    #[fail(display = "VARIANT allocation failed for vartype: {}", vartype)]
     VariantAllocFailed{vartype: u32},
+    #[fail(display = "SafeArrayPutElement failed with HRESULT = 0x{}", hr)]
     PutElementFailed { hr: i32 }, 
+    #[fail(display = "IntoVariantError: {}", _0)]
     IntoVariantError(Box<IntoVariantError>),
 }
 
@@ -37,29 +50,39 @@ impl From<IntoSafeArrElemError> for ElementError {
 //SafeArrayExt
 //  into_safearray
 //  from_safearray
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum SafeArrayError {
+    #[fail(display = "{}", _0)]
     From(Box<FromSafeArrayError>),
+    #[fail(display = "{}", _0)]
     Into(Box<IntoSafeArrayError>), 
 }
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum FromSafeArrayError{
+    #[fail(display = "Safe array dimensions are invalid: {}", sa_dims)]
     SafeArrayDimsInvalid {sa_dims: u32},
+    #[fail(display = "expected vartype was not found - expected: {} - found: {}", expected, found)]
     VarTypeDoesNotMatch {expected: u32, found: u32},
+    #[fail(display = "SafeArrayGetLBound failed with HRESULT = 0x{}", hr)]
     SafeArrayLBoundFailed {hr: i32}, 
+    #[fail(display = "SafeArrayGetRBound failed with HRESULT = 0x{}", hr)]
     SafeArrayRBoundFailed {hr: i32},
+    #[fail(display = "SafeArrayGetVartype failed with HRESULT = 0x{}", hr)]
     SafeArrayGetVartypeFailed {hr: i32},
+    #[fail(display = "element conversion failed at index {} with {}", index, element)]
     ElementConversionFailed {
         index: usize, 
         element: Box<ElementError>
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum IntoSafeArrayError {
+    #[fail(display = "element conversion failed at index {} with {}", index, element)]
     ElementConversionFailed {
         index: usize, 
         element: Box<ElementError>
     },
+    #[fail(display = "safe array creation failed")]
     SafeArrayCreateFailed,
 }
 
@@ -93,8 +116,9 @@ impl IntoSafeArrayError {
 //BStringExt
 //  allocate_bstr
 //  allocate_managed_bstr
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum BStringError {
+    #[fail(display = "BSTR allocation failed for len: {}", len)]
     AllocateFailed {len: usize},    
 }
 
@@ -116,20 +140,30 @@ impl From<BStringError> for IntoVariantError {
 //  from_variant
 //  into_variant
 
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum FromVariantError {
+    #[fail(display = "expected vartype was not found - expected: {} - found: {}", expected, found)]
     VarTypeDoesNotMatch { expected: u32, found: u32 },
+    #[fail(display = "{}", _0)]
     AllocBStr(BStringError),
+    #[fail(display = "IUnknown pointer is null")]
     UnknownPtrNull,
+    #[fail(display = "IDispatch pointer is null")]
     DispatchPtrNull,
+    #[fail(display = "VARIANT pointer is null")]
     VariantPtrNull,
+    #[fail(display = "SAFEARRAY pointer is null")]
     ArrayPtrNull, 
+    #[fail(display = "void pointer is null")]
     CVoidPtrNull,
+    #[fail(display = "Safe array conversion failed: {}", _0)]
     SafeArrConvFailed(Box<SafeArrayError>),
 }
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum IntoVariantError {
+    #[fail(display = "{}", _0)]
     AllocBStrFailed(BStringError),
+    #[fail(display = "SafeArray conversion failed: {}", _0)]
     SafeArrConvFailed(Box<SafeArrayError>),
 }
 

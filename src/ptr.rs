@@ -62,9 +62,3 @@ impl<T> AsRef<T> for Ptr<T> {
         unsafe {self.as_ref()}
     }
 }
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    
-}
