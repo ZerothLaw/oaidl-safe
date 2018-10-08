@@ -6,6 +6,11 @@
 //!   * DECIMAL
 //! 
 
+#[cfg(impl_tryfrom)]
+use std::convert::{TryFrom};
+#[cfg(impl_tryfrom)]
+use std::num::{TryFromIntError};
+
 use rust_decimal::Decimal;
 
 use winapi::shared::wtypes::{CY, DATE, DECIMAL, DECIMAL_NEG, VARIANT_BOOL, VARIANT_TRUE};
@@ -337,12 +342,76 @@ impl AsRef<i32> for Int {
     }
 }
 
+#[cfg(impl_tryfrom)]
+impl TryFrom<i64> for Int {
+    type Error = TryFromIntError;
+    fn try_from(value: i64) -> Result<Self, Self::Error> {
+        Ok(Int(i32::try_from(value)?))
+    }
+}
+
+#[cfg(impl_tryfrom)]
+impl TryFrom<i128> for Int {
+    type Error = TryFromIntError;
+    fn try_from(value: i128) -> Result<Self, Self::Error> {
+        Ok(Int(i32::try_from(value)?))
+    }
+}
+
+#[cfg(impl_tryfrom)]
+impl TryFrom<i16> for Int {
+    type Error = TryFromIntError;
+    fn try_from(value: i16) -> Result<Self, Self::Error> {
+        Ok(Int(value as i32))
+    }
+}
+
+#[cfg(impl_tryfrom)]
+impl TryFrom<i8> for Int {
+    type Error = TryFromIntError;
+    fn try_from(value: i8) -> Result<Self, Self::Error> {
+        Ok(Int(value as i32))
+    }
+}
+
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct UInt(pub u32);
 
 impl AsRef<u32> for UInt {
     fn as_ref(&self) -> &u32 {
         &self.0
+    }
+}
+
+#[cfg(impl_tryfrom)]
+impl TryFrom<u64> for UInt {
+    type Error = TryFromIntError;
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        Ok(UInt(u32::try_from(value)?))
+    }
+}
+
+#[cfg(impl_tryfrom)]
+impl TryFrom<u128> for UInt {
+    type Error = TryFromIntError;
+    fn try_from(value: u128) -> Result<Self, Self::Error> {
+        Ok(UInt(u32::try_from(value)?))
+    }
+}
+
+#[cfg(impl_tryfrom)]
+impl TryFrom<u16> for UInt {
+    type Error = TryFromIntError;
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        Ok(UInt(value as u32))
+    }
+}
+
+#[cfg(impl_tryfrom)]
+impl TryFrom<u8> for UInt {
+    type Error = TryFromIntError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(UInt(value as u32))
     }
 }
 

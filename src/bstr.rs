@@ -15,8 +15,8 @@ use ptr::Ptr;
 pub type BSTR = *mut u16; 
 
 pub trait BStringExt {
-    fn allocate_bstr(self) -> Result<Ptr<u16>, BStringError>;
-    fn allocate_managed_bstr(self) -> Result<DroppableBString, BStringError>;
+    fn allocate_bstr(&mut self) -> Result<Ptr<u16>, BStringError>;
+    fn allocate_managed_bstr(&mut self) -> Result<DroppableBString, BStringError>;
     fn deallocate_bstr(bstr: Ptr<u16>);
     fn from_bstr(bstr: *mut u16) -> U16String;
     fn from_pbstr(bstr: Ptr<u16>) -> U16String;
@@ -24,9 +24,10 @@ pub trait BStringExt {
 }
 
 impl BStringExt for U16String {
-    fn allocate_bstr(self) -> Result<Ptr<u16>, BStringError> {
+    fn allocate_bstr(&mut self) -> Result<Ptr<u16>, BStringError> {
         let sz = self.len();
-        let rw = self.as_ptr();
+        let cln = self.clone();
+        let rw = cln.as_ptr();
         let bstr: BSTR = unsafe {SysAllocStringLen(rw, sz as u32)};
         match Ptr::with_checked(bstr) {
             Some(pbstr) => Ok(pbstr), 
@@ -34,7 +35,7 @@ impl BStringExt for U16String {
         }
     }
 
-    fn allocate_managed_bstr(self) -> Result<DroppableBString, BStringError> {
+    fn allocate_managed_bstr(&mut self) -> Result<DroppableBString, BStringError> {
         Ok(DroppableBString{ inner: Some(self.allocate_bstr()?) })
     }
 

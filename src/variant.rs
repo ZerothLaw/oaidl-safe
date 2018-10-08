@@ -472,7 +472,7 @@ variant_impl!{
             Ok(bstr.to_string_lossy())
         }}
         into => {|slf: &mut String|{
-            let bstr = U16String::from_str(slf);
+            let mut bstr = U16String::from_str(slf);
             match bstr.allocate_bstr(){
                 Ok(ptr) => Ok(ptr.as_ptr()), 
                 Err(bse) => Err(IntoVariantError::from(bse))
@@ -565,8 +565,7 @@ variant_impl!{
         }
         into => {
             |slf: &mut Box<bool>|-> Result<_, IntoVariantError> {
-                let bptr = Box::new(VARIANT_BOOL::from(**slf));
-                Ok(Box::into_raw(bptr))
+                Ok(Box::into_raw(Box::new(VARIANT_BOOL::from(VariantBool::from(**slf)))))
             }
         }
     }
@@ -588,8 +587,7 @@ variant_impl!{
         from => { |n_ptr: &*mut CY| Ok(Box::new(Currency::from(**n_ptr))) }
         into => {
             |slf: &mut Box<Currency>|-> Result<_, IntoVariantError>  {
-                let bptr = Box::new(CY::from(**slf));
-                Ok(Box::into_raw(bptr))
+                Ok(Box::into_raw(Box::new(CY::from(**slf))))
             }
         }
     }
@@ -616,7 +614,7 @@ variant_impl!{
             Ok(Box::new(bstr.to_string_lossy()))
         }}
         into => {|slf: &mut Box<String>| -> Result<_, IntoVariantError> {
-            let bstr = U16String::from_str(&**slf);
+            let mut bstr = U16String::from_str(&**slf);
             let bstr = Box::new(bstr.allocate_bstr().unwrap().as_ptr());
             Ok(Box::into_raw(bstr))
         }}
@@ -1008,7 +1006,68 @@ mod test {
         type Bi16 = Box<i16>;
         validate_variant!(Bi16, Box::new(139), VT_PI2);
     }
-    //test Variant<T>
+    #[test]
+    fn test_box_i32() {
+        type Bi32 = Box<i32>;
+        validate_variant!(Bi32, Box::new(139), VT_PI4);
+    }
+    #[test]
+    fn test_box_i64() {
+        type Bi64 = Box<i64>;
+        validate_variant!(Bi64, Box::new(139), VT_PI8);
+    }
+    #[test]
+    fn test_box_f32() {
+        type Bf32 = Box<f32>;
+        validate_variant!(Bf32, Box::new(1337.9f32), VT_PR4);
+    }
+    #[test]
+    fn test_box_f64() {
+        type Bf64 = Box<f64>;
+        validate_variant!(Bf64, Box::new(1337.9f64), VT_PR8);
+    }
+    #[test]
+    fn test_box_bool() {
+        type Bbool = Box<bool>;
+        validate_variant!(Bbool, Box::new(true), VT_PBOOL);
+    }
+    #[test]
+    fn test_box_scode() {
+        type BSCode = Box<SCode>;
+        validate_variant!(BSCode, Box::new(SCode(-50)), VT_PERROR);
+    }
+    #[test]
+    fn test_box_cy() {
+        type BCy = Box<Currency>;
+        validate_variant!(BCy, Box::new(Currency(137)), VT_PCY);
+    }
+    #[test]
+    fn test_box_date() {
+        type BDate = Box<Date>;
+        validate_variant!(BDate, Box::new(Date(-10.333f64)), VT_PDATE);
+    }
+    #[test]
+    fn test_box_str() {
+        type BStr = Box<String>;
+        validate_variant!(BStr, Box::new(String::from("testing abc1267 ?Ťũřǐꝥꞔ")), VT_PBSTR);
+    }
+    #[test]
+    fn test_variant() {
+        let mut v = Variant::new(1000u64);
+        let var = match v.into_variant() {
+            Ok(var) => var, 
+            Err(_) => panic!("Error")
+        };
+        assert!(!var.as_ptr().is_null());
+        unsafe {
+            let pvar = var.as_ptr();
+            let n1 = (*pvar).n1;
+            let tv: &__tagVARIANT = n1.n2();
+            assert_eq!(tv.vt as u32, VT_VARIANT);
+        };
+        let var = Variant::<u64>::from_variant(var);
+        assert_eq!(v, var.unwrap());
+    }
     //test SafeArray<T>
     //Ptr<c_void>
     #[test]
@@ -1027,33 +1086,31 @@ mod test {
     fn test_u64() {
         validate_variant!(u64, 11976u64, VT_UI8);
     }
-
     #[test]
-    fn test_variant() {
-        let mut v = Variant::new(1000u64);
-        let var = match v.into_variant() {
-            Ok(var) => var, 
-            Err(_) => panic!("Error")
-        };
-        assert!(!var.as_ptr().is_null());
-        unsafe {
-            let pvar = var.as_ptr();
-            let n1 = (*pvar).n1;
-            let tv: &__tagVARIANT = n1.n2();
-            assert_eq!(tv.vt as u32, VT_VARIANT);
-        };
-        let var = Variant::<u64>::from_variant(var);
-        assert_eq!(v, var.unwrap());
-        
+    fn test_box_i8() {
+        type Bi8 = Box<i8>;
+        validate_variant!(Bi8, Box::new(-119i8), VT_PI1);
     }
-
+    #[test]
+    fn test_box_u16() {
+        type Bu16 = Box<u16>;
+        validate_variant!(Bu16, Box::new(119u16), VT_PUI2);
+    }
+    #[test]
+    fn test_box_u32() {
+        type Bu32 = Box<u32>;
+        validate_variant!(Bu32, Box::new(11976u32), VT_PUI4);
+    }
+    #[test]
+    fn test_box_u64() {
+        type Bu64 = Box<u64>;
+        validate_variant!(Bu64, Box::new(11976u64), VT_PUI8);
+    }
     #[test]
     fn test_send() {
         fn assert_send<T: Send>() {}
         assert_send::<Variant<i64>>();
     }
-
-
     #[test]
     fn test_sync() {
         fn assert_sync<T: Sync>() {}

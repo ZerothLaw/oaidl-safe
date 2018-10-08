@@ -1,3 +1,5 @@
+#![feature(try_from)]
+#![doc(html_root_url = "https://docs.rs/oaidl/0.1.0")]
 #[macro_use] extern crate failure;
 
 extern crate rust_decimal;

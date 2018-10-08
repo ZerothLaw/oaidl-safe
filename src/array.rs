@@ -4,19 +4,20 @@ use std::ptr::{null_mut};
 
 use rust_decimal::Decimal;
 
-use widestring::U16String;
+// use widestring::U16String;
 
 use winapi::ctypes::{c_long, c_void};
 
 use winapi::shared::minwindef::{UINT, ULONG,};
 use winapi::shared::ntdef::HRESULT;
 use winapi::shared::wtypes::{
+    // BSTR,
+    CY, 
     DATE, 
-    DECIMAL, 
-    CY,  
+    DECIMAL,  
     VARTYPE,
     VARIANT_BOOL,
-    VT_BSTR, 
+    // VT_BSTR, 
     VT_BOOL,
     VT_CY,
     VT_DATE,
@@ -42,7 +43,7 @@ use winapi::shared::wtypesbase::{SCODE};
 use winapi::um::oaidl::{IDispatch, LPSAFEARRAY, LPSAFEARRAYBOUND, SAFEARRAY, SAFEARRAYBOUND, VARIANT};
 use winapi::um::unknwnbase::IUnknown;
 
-use bstr::BStringExt;
+// use bstr::BStringExt;
 use errors::{
     FromSafeArrayError, 
     FromSafeArrElemError, 
@@ -161,7 +162,6 @@ impl<T: SafeArrayElement> SafeArrayExt<T> for Vec<T> {
         }
     }
 } 
-//TODO: rewrite this and associated macro calls to extra repetitive code
 macro_rules! safe_arr_impl {
     (
         impl $(< $tn:ident : $tc:ident >)* SafeArrayElement for $t:ty {
@@ -248,18 +248,33 @@ safe_arr_impl!{impl SafeArrayElement for Date{
     from => { |dt| Ok(Date::from(dt)) } 
     into => { |slf: &mut Date| -> Result<_, IntoSafeArrElemError> {Ok(DATE::from(*slf)) }}
 }}
-// safe_arr_impl!(String => VT_BSTR);
+// Need to wrap the string in a variant because its not working otherwise. 
 safe_arr_impl!{impl SafeArrayElement for String {
-    SFTYPE = VT_BSTR;
-    def => {null_mut()}
-    from => {|bstr| Ok(U16String::from_bstr(bstr).to_string_lossy())}
-    into => {|slf: &mut String|{
-        let bstr = U16String::from_str(slf);
-        let bstr = match bstr.allocate_bstr() {
-            Ok(bstr) => bstr, 
-            Err(ex) => return Err(ex)
+    SFTYPE = VT_VARIANT;
+    ptr
+    def => {{
+        let mut var: VARIANT = unsafe {mem::zeroed()};
+        &mut var as *mut VARIANT
+    }}
+    from => {|pvar| {
+        let pnn = match Ptr::with_checked(pvar) {
+            Some(nn) => nn, 
+            None => return Err(FromSafeArrElemError::VariantPtrNull)
         };
-        Ok(bstr.as_ptr())
+        match Variant::<String>::from_variant(pnn) {
+            Ok(var) => Ok(var.unwrap()), 
+            Err(_) => return Err(FromSafeArrElemError::FromVariantFailed)
+        }
+    }}
+    into => {|slf: &mut String|{
+        let mut slf = Variant::new(slf.clone());
+        match slf.into_variant() {
+            Ok(slf) => {
+                let mut s = slf.as_ptr();
+                Ok(s)
+            }, 
+            Err(ive) => Err(IntoSafeArrElemError::from(ive))
+        }
     }}
 }}
 safe_arr_impl!{impl SafeArrayElement for Ptr<IDispatch>{
@@ -440,12 +455,37 @@ mod test {
         validate_safe_arr!(f32, vec![0.0f32,-1.333f32,2f32,3f32,4f32], VT_R4 );
     }
     #[test]
+    fn test_f64() {
+        validate_safe_arr!(f64, vec![0.0f64,-1.333f64,2f64,3f64,4f64], VT_R8 );
+    }
+    #[test]
     fn test_cy() {
         validate_safe_arr!(Currency, vec![Currency(-1), Currency(2)], VT_CY );
     }
     #[test]
     fn test_date() {
         validate_safe_arr!(Date, vec![Date(0.01), Date(100.0/99.0)], VT_DATE );
+    }
+
+    #[test]
+    fn test_str() {
+        let mut v: Vec<String> = vec![String::from("validate"), String::from("test string")];
+
+        let p = v.into_safearray().unwrap();
+
+        let r = Vec::<String>::from_safearray(p.as_ptr());
+
+        let r = r.unwrap();
+        assert_eq!(r, vec![String::from("validate"), String::from("test string")]);
+    }
+
+    #[test]
+    fn test_scode() {
+        validate_safe_arr!(SCode, vec![SCode(100), SCode(10000)], VT_ERROR );
+    }
+    #[test]
+    fn test_bool() {
+        validate_safe_arr!(bool, vec![true, false, true, true, false, false, true], VT_BOOL );
     }
 
     #[test]
@@ -457,6 +497,27 @@ mod test {
         let r = Vec::<Variant<u64>>::from_safearray(p.as_ptr());
         let r = r.unwrap();
         assert_eq!(r,  vec![Variant::new(100u64), Variant::new(100u64), Variant::new(103u64)]);
+    }
+
+    #[test]
+    fn test_decimal() {
+        validate_safe_arr!(Decimal, vec![Decimal::new(2, 2), Decimal::new(3, 3)], VE_DECIMAL );
+    }
+    #[test]
+    fn test_i8() {
+        validate_safe_arr!(i8, vec![-1, 0,1,2,3,4], VT_I1 );
+    }
+    #[test]
+    fn test_u8() {
+        validate_safe_arr!(u8, vec![0,1,2,3,4], VT_UI1 );
+    }
+    #[test]
+    fn test_u16() {
+        validate_safe_arr!(u16, vec![0,1,2,3,4], VT_UI2 );
+    }
+    #[test]
+    fn test_u32() {
+        validate_safe_arr!(u32, vec![0,1,2,3,4], VT_UI4 );
     }
 
     #[test]
