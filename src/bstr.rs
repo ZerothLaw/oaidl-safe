@@ -84,7 +84,7 @@ pub struct DroppableBString {
 }
 
 impl DroppableBString {
-    /// consume() -> *mut u16 returns the contained data
+    /// `consume()` -> `*mut u16` returns the contained data
     /// while also setting a flag that the data has been
     /// consumed. It is your responsibility to manage the 
     /// memory yourself. Most uses of BSTR in FFI will

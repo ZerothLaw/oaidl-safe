@@ -9,11 +9,11 @@
 //#![deny(trivial_casts)]
 #![deny(trivial_numeric_casts)]
 #![deny(unreachable_pub)]
-#![deny(unused)]
+//#![deny(unused)]
 
 //Turn these warnings into errors
 #![deny(const_err)]
-#![deny(dead_code)]
+//#![deny(dead_code)]
 #![deny(deprecated)]
 #![deny(improper_ctypes)]
 #![deny(overflowing_literals)]

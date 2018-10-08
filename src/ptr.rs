@@ -1,8 +1,8 @@
 use std::fmt;
 use std::ptr::NonNull;
 
-/// Convenience type for holding value of *mut T
-/// Mostly just a projection of NonNull<T> functionality
+/// Convenience type for holding value of `*mut T`
+/// Mostly just a projection of `NonNull<T>` functionality
 #[derive(Debug, Eq, Hash, PartialOrd, PartialEq)]
 pub struct Ptr<T> {
     inner: NonNull<T>
@@ -16,12 +16,12 @@ impl<T: Clone> Clone for Ptr<T> {
 }
 
 impl<T> Ptr<T> {
-    /// Wraps a valid NonNull<T> 
+    /// Wraps a valid `NonNull<T>` 
     pub fn new(p: NonNull<T>) -> Ptr<T> {
         Ptr { inner: p }
     }
 
-    /// Checks a *mut T for null and wraps it up for easier handling.
+    /// Checks a `*mut T` for null and wraps it up for easier handling.
     pub fn with_checked(p: *mut T) -> Option<Ptr<T>> {
         match NonNull::new(p) {
             Some(p) => Some(Ptr::new(p)),
@@ -39,7 +39,7 @@ impl<T> Ptr<T> {
         self.inner.as_ref()
     }
 
-    /// Cast a Ptr<T> to Ptr<U>
+    /// Cast a `Ptr<T>` to `Ptr<U>`
     pub fn cast<U>(self) -> Ptr<U> {
         Ptr::new(self.inner.cast())
     }
