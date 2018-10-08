@@ -18,7 +18,7 @@
 #![deny(improper_ctypes)]
 #![deny(overflowing_literals)]
 
-#![doc(html_root_url = "https://docs.rs/oaidl/0.1.0")]
+#![doc(html_root_url = "https://docs.rs/oaidl/0.1.1")]
 //! # Introduction
 //! 
 //! A module to handle conversion to and from common OLE/COM types - VARIANT, SAFEARRAY, and BSTR. 
