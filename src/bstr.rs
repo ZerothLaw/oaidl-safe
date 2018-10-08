@@ -3,8 +3,8 @@ use std::ptr::null_mut;
 use winapi::um::oleauto::{SysAllocStringLen, SysFreeString, SysStringLen};
 use widestring::U16String;
 
-use errors::BStringError;
-use ptr::Ptr;
+use super::errors::BStringError;
+use super::ptr::Ptr;
 
 // pub type wchar_t = u16;
 // pub type WCHAR = wchar_t;

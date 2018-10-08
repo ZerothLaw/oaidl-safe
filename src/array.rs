@@ -43,15 +43,15 @@ use winapi::um::oaidl::{IDispatch, LPSAFEARRAY, LPSAFEARRAYBOUND, SAFEARRAY, SAF
 use winapi::um::unknwnbase::IUnknown;
 
 // use bstr::BStringExt;
-use errors::{
+use super::errors::{
     FromSafeArrayError, 
     FromSafeArrElemError, 
     IntoSafeArrayError, 
     IntoSafeArrElemError,
 };
-use ptr::Ptr;
-use types::{Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool};
-use variant::{Variant, VariantExt};
+use super::ptr::Ptr;
+use super::types::{Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool};
+use super::variant::{Variant, VariantExt};
 
 /// Helper trait implemented for types that can be converted into a safe array. 
 /// Generally, don't implement this yourself without care.
@@ -116,6 +116,11 @@ impl Drop for SafeArrayDestructor {
         self.inner = null_mut();
     }
 }
+
+/*#[feature="impl_iter"]
+impl<T: SafeArrayElement, I: Iterator<Item=T>> SafeArrayExt<T> for I {
+
+}*/
 
 impl<T: SafeArrayElement> SafeArrayExt<T> for Vec<T> {
     fn into_safearray(&mut self) -> Result<Ptr<SAFEARRAY>, IntoSafeArrayError > {

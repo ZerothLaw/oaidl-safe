@@ -162,11 +162,11 @@ use winapi::um::oaidl::{IDispatch,  __tagVARIANT, SAFEARRAY, VARIANT, VARIANT_n3
 use winapi::um::oleauto::VariantClear;
 use winapi::um::unknwnbase::IUnknown;
 
-use array::{SafeArrayElement, SafeArrayExt};
-use bstr::BStringExt;
-use errors::{IntoVariantError, FromVariantError};
-use ptr::Ptr;
-use types::{Date, DecWrapper, Currency, Int, SCode, UInt, VariantBool };
+use super::array::{SafeArrayElement, SafeArrayExt};
+use super::bstr::BStringExt;
+use super::errors::{IntoVariantError, FromVariantError};
+use super::ptr::Ptr;
+use super::types::{Date, DecWrapper, Currency, Int, SCode, UInt, VariantBool };
 
 const VT_PUI1: u32 = VT_BYREF | VT_UI1;
 const VT_PI2: u32 = VT_BYREF | VT_I2;

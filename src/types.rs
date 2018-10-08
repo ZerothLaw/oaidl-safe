@@ -5,10 +5,10 @@
 //!   * DATE
 //!   * DECIMAL
 
-#[cfg(impl_tryfrom)]
+#[cfg(feature = "impl_tryfrom")]
 use std::convert::{TryFrom};
 
-#[cfg(impl_tryfrom)]
+#[cfg(feature = "impl_tryfrom")]
 use std::num::{TryFromIntError};
 
 use rust_decimal::Decimal;
@@ -354,7 +354,7 @@ impl AsRef<i32> for Int {
     }
 }
 
-#[cfg(impl_tryfrom)]
+#[cfg(feature = "impl_tryfrom")]
 impl TryFrom<i64> for Int {
     type Error = TryFromIntError;
     fn try_from(value: i64) -> Result<Self, Self::Error> {
@@ -362,7 +362,7 @@ impl TryFrom<i64> for Int {
     }
 }
 
-#[cfg(impl_tryfrom)]
+#[cfg(feature = "impl_tryfrom")]
 impl TryFrom<i128> for Int {
     type Error = TryFromIntError;
     fn try_from(value: i128) -> Result<Self, Self::Error> {
@@ -370,7 +370,7 @@ impl TryFrom<i128> for Int {
     }
 }
 
-#[cfg(impl_tryfrom)]
+#[cfg(feature = "impl_tryfrom")]
 impl TryFrom<i16> for Int {
     type Error = TryFromIntError;
     fn try_from(value: i16) -> Result<Self, Self::Error> {
@@ -378,7 +378,7 @@ impl TryFrom<i16> for Int {
     }
 }
 
-#[cfg(impl_tryfrom)]
+#[cfg(feature = "impl_tryfrom")]
 impl TryFrom<i8> for Int {
     type Error = TryFromIntError;
     fn try_from(value: i8) -> Result<Self, Self::Error> {
@@ -396,7 +396,7 @@ impl AsRef<u32> for UInt {
     }
 }
 
-#[cfg(impl_tryfrom)]
+#[cfg(feature = "impl_tryfrom")]
 impl TryFrom<u64> for UInt {
     type Error = TryFromIntError;
     fn try_from(value: u64) -> Result<Self, Self::Error> {
@@ -404,7 +404,7 @@ impl TryFrom<u64> for UInt {
     }
 }
 
-#[cfg(impl_tryfrom)]
+#[cfg(feature = "impl_tryfrom")]
 impl TryFrom<u128> for UInt {
     type Error = TryFromIntError;
     fn try_from(value: u128) -> Result<Self, Self::Error> {
@@ -412,7 +412,7 @@ impl TryFrom<u128> for UInt {
     }
 }
 
-#[cfg(impl_tryfrom)]
+#[cfg(feature = "impl_tryfrom")]
 impl TryFrom<u16> for UInt {
     type Error = TryFromIntError;
     fn try_from(value: u16) -> Result<Self, Self::Error> {
@@ -420,7 +420,7 @@ impl TryFrom<u16> for UInt {
     }
 }
 
-#[cfg(impl_tryfrom)]
+#[cfg(feature = "impl_tryfrom")]
 impl TryFrom<u8> for UInt {
     type Error = TryFromIntError;
     fn try_from(value: u8) -> Result<Self, Self::Error> {
@@ -506,5 +506,12 @@ mod tests {
         assert_sync::<SCode>();
         assert_sync::<UInt>();
         assert_sync::<VariantBool>();
+    }
+
+    #[cfg(feature = "impl_tryfrom")]
+    #[cfg_attr(feature = "impl_tryfrom", test)]
+    fn test_tryfrom() {
+        let v = Int::try_from(999999999999999i64);
+        assert!(v.is_err());
     }
 }

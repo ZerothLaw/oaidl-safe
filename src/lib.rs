@@ -1,4 +1,4 @@
-#![feature(try_from)]
+#![cfg_attr(feature = "impl_tryfrom", feature(try_from))]
 
 //Enable lints for specific cases
 #![deny(future_incompatible)]
@@ -93,8 +93,8 @@ mod variant;
 // Types = Ptr, Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool, 
 //  Variant, VtEmpty, VtNull
 // Traits = BStringExt, SafeArrayElement, SafeArrayExt, VariantExt
-pub use array::{SafeArrayElement, SafeArrayExt};
-pub use bstr::{BStringExt, DroppableBString};
-pub use ptr::Ptr;
-pub use types::{Currency, Date, DecWrapper,Int, SCode, UInt, VariantBool};
-pub use variant::{Variant, VariantExt, VtEmpty, VtNull};
+pub use self::array::{SafeArrayElement, SafeArrayExt};
+pub use self::bstr::{BStringExt, DroppableBString};
+pub use self::ptr::Ptr;
+pub use self::types::{Currency, Date, DecWrapper,Int, SCode, UInt, VariantBool};
+pub use self::variant::{Variant, VariantExt, VtEmpty, VtNull};
