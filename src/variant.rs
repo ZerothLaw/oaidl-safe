@@ -157,66 +157,81 @@ use winapi::shared::wtypes::{
     VT_UNKNOWN, 
     VT_VARIANT, 
 };
-use winapi::shared::wtypesbase::{SCODE};
+use winapi::shared::wtypesbase::SCODE;
 use winapi::um::oaidl::{IDispatch,  __tagVARIANT, SAFEARRAY, VARIANT, VARIANT_n3, VARIANT_n1};
-use winapi::um::oleauto::{VariantClear};
+use winapi::um::oleauto::VariantClear;
 use winapi::um::unknwnbase::IUnknown;
 
 use array::{SafeArrayElement, SafeArrayExt};
-use bstr::{BStringExt};
+use bstr::BStringExt;
 use errors::{IntoVariantError, FromVariantError};
 use ptr::Ptr;
 use types::{Date, DecWrapper, Currency, Int, SCode, UInt, VariantBool };
 
-pub const VT_PUI1: u32 = VT_BYREF | VT_UI1;
-pub const VT_PI2: u32 = VT_BYREF | VT_I2;
-pub const VT_PI4: u32 = VT_BYREF | VT_I4;
-pub const VT_PI8: u32 = VT_BYREF | VT_I8;
-pub const VT_PUI8: u32 = VT_BYREF | VT_UI8;
-pub const VT_PR4: u32 = VT_BYREF | VT_R4;
-pub const VT_PR8: u32 = VT_BYREF | VT_R8;
-pub const VT_PBOOL: u32 = VT_BYREF | VT_BOOL;
-pub const VT_PERROR: u32 = VT_BYREF | VT_ERROR;
-pub const VT_PCY: u32 = VT_BYREF | VT_CY;
-pub const VT_PDATE: u32 = VT_BYREF | VT_DATE;
-pub const VT_PBSTR: u32 = VT_BYREF | VT_BSTR;
-pub const VT_PUNKNOWN: u32 = VT_BYREF | VT_UNKNOWN;
-pub const VT_PDISPATCH: u32 = VT_BYREF | VT_DISPATCH;
-pub const VT_PDECIMAL: u32 = VT_BYREF | VT_DECIMAL;
-pub const VT_PI1: u32 = VT_BYREF | VT_I1;
-pub const VT_PUI2: u32 = VT_BYREF | VT_UI2;
-pub const VT_PUI4: u32 = VT_BYREF | VT_UI4;
-pub const VT_PINT: u32 = VT_BYREF | VT_INT;
-pub const VT_PUINT: u32 = VT_BYREF | VT_UINT;
+const VT_PUI1: u32 = VT_BYREF | VT_UI1;
+const VT_PI2: u32 = VT_BYREF | VT_I2;
+const VT_PI4: u32 = VT_BYREF | VT_I4;
+const VT_PI8: u32 = VT_BYREF | VT_I8;
+const VT_PUI8: u32 = VT_BYREF | VT_UI8;
+const VT_PR4: u32 = VT_BYREF | VT_R4;
+const VT_PR8: u32 = VT_BYREF | VT_R8;
+const VT_PBOOL: u32 = VT_BYREF | VT_BOOL;
+const VT_PERROR: u32 = VT_BYREF | VT_ERROR;
+const VT_PCY: u32 = VT_BYREF | VT_CY;
+const VT_PDATE: u32 = VT_BYREF | VT_DATE;
+const VT_PBSTR: u32 = VT_BYREF | VT_BSTR;
+const VT_PUNKNOWN: u32 = VT_BYREF | VT_UNKNOWN;
+const VT_PDISPATCH: u32 = VT_BYREF | VT_DISPATCH;
+const VT_PDECIMAL: u32 = VT_BYREF | VT_DECIMAL;
+const VT_PI1: u32 = VT_BYREF | VT_I1;
+const VT_PUI2: u32 = VT_BYREF | VT_UI2;
+const VT_PUI4: u32 = VT_BYREF | VT_UI4;
+const VT_PINT: u32 = VT_BYREF | VT_INT;
+const VT_PUINT: u32 = VT_BYREF | VT_UINT;
 
-pub trait VariantExt: Sized { //Would like Clone + Default, but IDispatch and IUnknown don't implement them
+/// Trait implemented to convert the type into a VARIANT
+/// Do not implement this yourself without care. 
+pub trait VariantExt: Sized { //Would like Clone, but *mut IDispatch and *mut IUnknown don't implement them
+    /// VARTYPE constant value for the type
     const VARTYPE: u32;
 
+    /// Call this associated function on a Ptr<VARIANT> to obtain a value T
     fn from_variant(var: Ptr<VARIANT>) -> Result<Self, FromVariantError>;  
+
+    /// Convert a value of type T into a Ptr<VARIANT>
     fn into_variant(&mut self) -> Result<Ptr<VARIANT>, IntoVariantError>;
 }
 
+/// Helper struct to wrap a VARIANT compatible type into a VT_VARIANT marked VARIANT
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Variant<T: VariantExt>(T);
 
-#[allow(dead_code)]
+/// `Variant<T: VariantExt>` type to wrap an impl of `VariantExt` - creates a VARIANT of VT_VARIANT
+/// which wraps an inner variant that points to T. 
 impl<T: VariantExt> Variant<T> {
+
+    /// default constructor
     pub fn new(t: T) -> Variant<T> {
         Variant(t)
     }
 
+    /// Get access to the inner value and the Variant is consumed
     pub fn unwrap(self) -> T {
         self.0
     }
 
+    /// Borrow reference to inner value
     pub fn borrow(&self) -> &T {
         &self.0
     }
 
+    /// Borrow mutable reference to inner value
     pub fn borrow_mut(&mut self) -> &mut T {
         &mut self.0
     }
 
+    /// Converts the `Variant<T>` into a `Ptr<VARIANT>`
+    /// Returns `Result<Ptr<VARIANT>, IntoVariantError>`
     pub fn into_variant(&mut self) -> Result<Ptr<VARIANT>, IntoVariantError> {
         #[allow(unused_mut)]
         let mut n3: VARIANT_n3 = unsafe {mem::zeroed()};
@@ -241,6 +256,8 @@ impl<T: VariantExt> Variant<T> {
         Ok(Ptr::with_checked(Box::into_raw(var)).unwrap())
     }
 
+    /// Converts `Ptr<VARIANT>` into  `Variant<T>` 
+    /// Returns `Result<Variant<T>>, FromVariantError>`
     pub fn from_variant(var: Ptr<VARIANT>) -> Result<Variant<T>, FromVariantError> {
         let var = var.as_ptr();
         let mut var_d = VariantDestructor::new(var);
@@ -869,7 +886,12 @@ variant_impl!{
     }
 }
 
+/// Helper type for VT_EMPTY variants
+#[derive(Clone, Copy, Debug)]
 pub struct VtEmpty{}
+
+/// Helper type for VT_NULL variants
+#[derive(Clone, Copy, Debug)]
 pub struct VtNull{}
 
 impl VariantExt for VtEmpty {

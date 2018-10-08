@@ -1,5 +1,5 @@
 [package]
-name = "oaidl-safe"
+name = "oaidl"
 version = "0.1.0"
 authors = ["ZerothLaw <trinioler@gmail.com>"]
 description = "Crate to manage conversions to/from SAFEARRAY, VARIANT, and BSTR data structures in COM interop"

@@ -1,5 +1,77 @@
 #![feature(try_from)]
+
+//Enable lints for specific cases
+#![deny(future_incompatible)]
+#![deny(missing_copy_implementations)]
+#![deny(missing_docs)]
+#![deny(nonstandard_style)]
+//#![deny(single_use_lifetimes)]
+//#![deny(trivial_casts)]
+#![deny(trivial_numeric_casts)]
+#![deny(unreachable_pub)]
+#![deny(unused)]
+
+//Turn these warnings into errors
+#![deny(const_err)]
+#![deny(dead_code)]
+#![deny(deprecated)]
+#![deny(improper_ctypes)]
+#![deny(overflowing_literals)]
+
 #![doc(html_root_url = "https://docs.rs/oaidl/0.1.0")]
+//! # Introduction
+//! 
+//! A module to handle conversion to and from common OLE/COM types - VARIANT, SAFEARRAY, and BSTR. 
+//! 
+//! This module provides some convenience types as well as traits and trait implementations for 
+//! built in rust types - `u8`, `i8`, `u1`, `i16`, `u32`, `i32`, `u64`, `f32`, `f64`, `String`, `bool` 
+//! to and from `VARIANT` structures. 
+//! In addition, `Vec<T>` can be converted into a `SAFEARRAY` where `T:
+//! i8`, `u8`, `u16`, `i16`, `u32`, `i32`, `String`, `f32`, `f64`, `bool`.
+//! 
+//! In addition, `IUnknown`, `IDispatch` pointers can be marshalled back and forth across boundaries.
+//! 
+//! There are some convenience types provided for further types that VARIANT/SAFEARRAY support:
+//! `SCode`, `Int`, `UInt`, `Currency`, `Date`, `DecWrapper`, `VtEmpty`, `VtNull`
+//! 
+//! The relevant traits to use are: `BStringExt`, `SafeArrayElement`, `SafeArrayExt`, and `VariantExt`
+//! 
+//! ## Examples
+//! 
+//! An example of how to use the module:
+//! 
+//! ```rust
+//! extern crate oaidl;
+//! extern crate winapi;
+//! 
+//! use winapi::um::oaidl::VARIANT;
+//! 
+//! use oaidl::{VariantExt};
+//! 
+//! //simulate an FFI function
+//! unsafe fn c_masq(s: *mut VARIANT, p: *mut VARIANT) {
+//!     println!("vt of s: {}", (*s).n1.n2_mut().vt);
+//!     println!("vt of p: {}", (*p).n1.n2_mut().vt);
+//!     
+//!     //free the memory allocated for these VARIANTS
+//!     let s = *s;
+//!     let p = *p;
+//! }
+//! 
+//! fn main() {
+//!     let mut u = 1337u32;
+//!     let mut sr = String::from("Turing completeness.");
+//!     let p = match u.into_variant() {
+//!         Ok(pvar) => pvar, 
+//!         Err(ex) => panic!(ex),
+//!     };
+//!     let s = match sr.into_variant() {
+//!         Ok(pvar) => pvar, 
+//!         Err(ex) => panic!(ex)
+//!     };
+//!     unsafe {c_masq(s.as_ptr(), p.as_ptr())};
+//! } 
+
 #[macro_use] extern crate failure;
 
 extern crate rust_decimal;
@@ -20,8 +92,9 @@ mod variant;
 
 // Types = Ptr, Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool, 
 //  Variant, VtEmpty, VtNull
-// Traits = SafeArrayElement, SafeArrayExt, VariantExt
+// Traits = BStringExt, SafeArrayElement, SafeArrayExt, VariantExt
 pub use array::{SafeArrayElement, SafeArrayExt};
-pub use ptr::{Ptr};
+pub use bstr::{BStringExt, DroppableBString};
+pub use ptr::Ptr;
 pub use types::{Currency, Date, DecWrapper,Int, SCode, UInt, VariantBool};
 pub use variant::{Variant, VariantExt, VtEmpty, VtNull};

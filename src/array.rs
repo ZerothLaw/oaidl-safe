@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 use std::mem;
-use std::ptr::{null_mut};
+use std::ptr::null_mut;
 
 use rust_decimal::Decimal;
 
@@ -38,7 +38,6 @@ use winapi::shared::wtypes::{
     VT_UNKNOWN, 
     VT_VARIANT,   
 };
-use winapi::shared::wtypesbase::{SCODE};
 
 use winapi::um::oaidl::{IDispatch, LPSAFEARRAY, LPSAFEARRAYBOUND, SAFEARRAY, SAFEARRAYBOUND, VARIANT};
 use winapi::um::unknwnbase::IUnknown;
@@ -54,15 +53,31 @@ use ptr::Ptr;
 use types::{Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool};
 use variant::{Variant, VariantExt};
 
+/// Helper trait implemented for types that can be converted into a safe array. 
+/// Generally, don't implement this yourself without care.
+/// Implemented for types:
+///     * i8, u8, i16, u16, i32, u32
+///     * bool, f32, f64
+///     * String, Variant<T>, 
+///     * Ptr<IUnknown>, Ptr<IDispatch>
+/// 
 pub trait SafeArrayElement: Sized {
+    /// This is the VT value used to create the SAFEARRAY
     const SFTYPE: u32;
 
+    /// puts a type into the safearray at the specified index (default impls use SafeArrayPutElement)
     fn into_safearray(&mut self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), IntoSafeArrElemError>;
+    /// gets a type from the safearray at the specified index (default impls use SafeArrayGetElement)
     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self, FromSafeArrElemError>;
 }
 
+/// Workhorse trait and main interface for converting to/from SAFEARRAY
+/// Default impl is on `Vec<T: SafeArrayElement>` 
 pub trait SafeArrayExt<T: SafeArrayElement> {
+    /// Use `t.into_safearray()` to convert a type into a SAFEARRAY
     fn into_safearray(&mut self) -> Result<Ptr<SAFEARRAY>, IntoSafeArrayError>;
+    
+    /// Use `T::from_safearray(psa)` to convert a safearray pointer into the relevant T
     fn from_safearray(psa: *mut SAFEARRAY) -> Result<Vec<T>, FromSafeArrayError>;
 }
 
@@ -114,7 +129,7 @@ impl<T: SafeArrayElement> SafeArrayExt<T> for Vec<T> {
         for (ix, mut elem) in self.iter_mut().enumerate() {
             match elem.into_safearray(psa, ix as i32) {
                 Ok(()) => continue, 
-                Err(e) => return Err(IntoSafeArrayError::from_element_err(e, ix as usize))
+                Err(e) => return Err(IntoSafeArrayError::from_element_err(e, ix))
             }
         }
         sad.inner = null_mut();
@@ -244,7 +259,7 @@ safe_arr_impl!{impl SafeArrayElement for Currency{
 }}
 safe_arr_impl!{impl SafeArrayElement for Date{
     SFTYPE = VT_DATE; 
-    def =>  { 0f64 as DATE }
+    def =>  { 0f64 }
     from => { |dt| Ok(Date::from(dt)) } 
     into => { |slf: &mut Date| -> Result<_, IntoSafeArrElemError> {Ok(DATE::from(*slf)) }}
 }}
@@ -294,13 +309,13 @@ safe_arr_impl!{impl SafeArrayElement for Ptr<IDispatch>{
 }}
 safe_arr_impl!{impl SafeArrayElement for SCode {
     SFTYPE = VT_ERROR;
-    def => {0 as SCODE}
+    def => {0}
     from => {|sc| Ok(SCode(sc))}
     into => { |slf: &mut SCode| -> Result<_, IntoSafeArrElemError> {Ok(slf.0) }}
 }}
 safe_arr_impl!{impl SafeArrayElement for bool {
     SFTYPE = VT_BOOL; 
-    def => {0 as VARIANT_BOOL}
+    def => {0}
     from => {|vb| Ok(bool::from(VariantBool::from(vb)))} 
     into => {
         |slf: &mut bool| -> Result<_, IntoSafeArrElemError> { Ok(VARIANT_BOOL::from(VariantBool::from(*slf)))}
@@ -409,23 +424,23 @@ safe_arr_impl!{impl SafeArrayElement for UInt {
 #[allow(dead_code)]
 #[link(name="OleAut32")]
 extern "system" {
-    pub fn SafeArrayCreate(vt: VARTYPE, cDims: UINT, rgsabound: LPSAFEARRAYBOUND) -> LPSAFEARRAY;
-	pub fn SafeArrayDestroy(safe: LPSAFEARRAY)->HRESULT;
+     fn SafeArrayCreate(vt: VARTYPE, cDims: UINT, rgsabound: LPSAFEARRAYBOUND) -> LPSAFEARRAY;
+	 fn SafeArrayDestroy(safe: LPSAFEARRAY)->HRESULT;
     
-    pub fn SafeArrayGetDim(psa: LPSAFEARRAY) -> UINT;
+     fn SafeArrayGetDim(psa: LPSAFEARRAY) -> UINT;
 	
-    pub fn SafeArrayGetElement(psa: LPSAFEARRAY, rgIndices: *const c_long, pv: *mut c_void) -> HRESULT;
-    pub fn SafeArrayGetElemSize(psa: LPSAFEARRAY) -> UINT;
+     fn SafeArrayGetElement(psa: LPSAFEARRAY, rgIndices: *const c_long, pv: *mut c_void) -> HRESULT;
+     fn SafeArrayGetElemSize(psa: LPSAFEARRAY) -> UINT;
     
-    pub fn SafeArrayGetLBound(psa: LPSAFEARRAY, nDim: UINT, plLbound: *mut c_long)->HRESULT;
-    pub fn SafeArrayGetUBound(psa: LPSAFEARRAY, nDim: UINT, plUbound: *mut c_long)->HRESULT;
+     fn SafeArrayGetLBound(psa: LPSAFEARRAY, nDim: UINT, plLbound: *mut c_long)->HRESULT;
+     fn SafeArrayGetUBound(psa: LPSAFEARRAY, nDim: UINT, plUbound: *mut c_long)->HRESULT;
     
-    pub fn SafeArrayGetVartype(psa: LPSAFEARRAY, pvt: *mut VARTYPE) -> HRESULT;
+     fn SafeArrayGetVartype(psa: LPSAFEARRAY, pvt: *mut VARTYPE) -> HRESULT;
 
-    pub fn SafeArrayLock(psa: LPSAFEARRAY) -> HRESULT;
-	pub fn SafeArrayUnlock(psa: LPSAFEARRAY) -> HRESULT;
+     fn SafeArrayLock(psa: LPSAFEARRAY) -> HRESULT;
+	 fn SafeArrayUnlock(psa: LPSAFEARRAY) -> HRESULT;
     
-    pub fn SafeArrayPutElement(psa: LPSAFEARRAY, rgIndices: *const c_long, pv: *mut c_void) -> HRESULT;
+     fn SafeArrayPutElement(psa: LPSAFEARRAY, rgIndices: *const c_long, pv: *mut c_void) -> HRESULT;
 }
 
 #[cfg(test)]

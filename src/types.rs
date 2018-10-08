@@ -4,10 +4,10 @@
 //!   * CY
 //!   * DATE
 //!   * DECIMAL
-//! 
 
 #[cfg(impl_tryfrom)]
 use std::convert::{TryFrom};
+
 #[cfg(impl_tryfrom)]
 use std::num::{TryFromIntError};
 
@@ -15,6 +15,7 @@ use rust_decimal::Decimal;
 
 use winapi::shared::wtypes::{CY, DATE, DECIMAL, DECIMAL_NEG, VARIANT_BOOL, VARIANT_TRUE};
 
+/// Helper type for the OLE/COM+ type CY
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, Debug, Eq,  Hash, PartialOrd, PartialEq)]
 pub struct Currency(pub i64);
@@ -73,6 +74,8 @@ impl AsRef<i64> for Currency {
     }
 }
 
+
+/// Helper type for the OLE/COM+ type DATE
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Date(pub f64); //DATE <--> F64
@@ -117,23 +120,29 @@ impl AsRef<f64> for Date {
     }
 }
 
+
+/// Helper type for the OLE/COM+ type DECIMAL
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DecWrapper(Decimal);
 
 impl DecWrapper {
+    /// wraps a `Decimal` from rust_decimal
     pub fn new(dec: Decimal) -> DecWrapper {
         DecWrapper(dec)
     }
 
+    /// Get access to the internal value, consuming it in the process
     pub fn unwrap(self) -> Decimal {
         self.0
     }
 
+    /// Get borrow of internal value
     pub fn borrow(&self) -> &Decimal {
         &self.0
     }
 
+    /// Get mutable borrow of internal value
     pub fn borrow_mut(&mut self) -> &mut Decimal {
         &mut self.0
     }
@@ -256,6 +265,8 @@ impl AsRef<Decimal> for DecWrapper {
     }
 }
 
+
+/// Helper type for the OLE/COM+ type VARIANT_BOOL
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct VariantBool(bool);
@@ -332,6 +343,7 @@ impl AsRef<bool> for VariantBool {
     }
 }
 
+/// Helper type for the OLE/COM+ type INT
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Int(pub i32);
@@ -374,6 +386,7 @@ impl TryFrom<i8> for Int {
     }
 }
 
+/// Helper type for the OLE/COM+ type UINT
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct UInt(pub u32);
 
@@ -415,6 +428,7 @@ impl TryFrom<u8> for UInt {
     }
 }
 
+/// Helper type for the OLE/COM+ type SCODE
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SCode(pub i32);

@@ -10,7 +10,7 @@ pub enum ElementError {
     #[fail(display = "{}", _0)]
     Into(Box<IntoSafeArrElemError>), 
 }
-#[derive(Debug, Fail)]
+#[derive(Copy, Clone, Debug, Fail)]
 pub enum FromSafeArrElemError {
     #[fail(display = "SafeArrayGetElement failed with HRESULT=0x{:x}", hr)]
     GetElementFailed { hr: i32 },
@@ -116,7 +116,7 @@ impl IntoSafeArrayError {
 //BStringExt
 //  allocate_bstr
 //  allocate_managed_bstr
-#[derive(Debug, Fail)]
+#[derive(Clone, Copy, Debug, Fail)]
 pub enum BStringError {
     #[fail(display = "BSTR allocation failed for len: {}", len)]
     AllocateFailed {len: usize},    
