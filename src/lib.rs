@@ -18,7 +18,7 @@
 #![deny(improper_ctypes)]
 #![deny(overflowing_literals)]
 
-#![doc(html_root_url = "https://docs.rs/oaidl/0.1.3")]
+#![doc(html_root_url = "https://docs.rs/oaidl/0.1.4")]
 //! # Introduction
 //! 
 //! A module to handle conversion to and from common OLE/COM types - VARIANT, SAFEARRAY, and BSTR. 
@@ -97,6 +97,7 @@ mod variant;
 // Traits = BStringExt, SafeArrayElement, SafeArrayExt, VariantExt
 pub use self::array::{SafeArrayElement, SafeArrayExt};
 pub use self::bstr::{BStringExt, DroppableBString};
+pub use self::errors::*;
 pub use self::ptr::Ptr;
 pub use self::types::{Currency, Date, DecWrapper,Int, SCode, UInt, VariantBool};
 pub use self::variant::{Variant, VariantExt, VtEmpty, VtNull};
