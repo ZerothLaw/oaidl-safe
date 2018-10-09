@@ -1,6 +1,6 @@
 [package]
 name = "oaidl"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["ZerothLaw <trinioler@gmail.com>"]
 description = "Crate to manage conversions to/from SAFEARRAY, VARIANT, and BSTR data structures in COM interop"
 license = "MIT"
@@ -8,7 +8,7 @@ repository = "https://github.com/ZerothLaw/oaidl-safe"
 readme = "README.md"
 keywords = ["COM", "interop", "safearray", "variant"]
 categories = ["api-bindings", "development-tools::ffi", "os::windows-apis"]
-documentation = "https://docs.rs/oaidl/0.1.2"
+documentation = "https://docs.rs/oaidl/0.1.3"
 
 [dependencies]
 # mandatory packages
@@ -23,3 +23,6 @@ serde = {version = "1.0", optional = true, features = ["derive"]}
 [features]
 default = []
 impl_tryfrom = []
+
+[package.metadata.docs.rs]
+default-target = "x86_64-pc-windows-msvc"
