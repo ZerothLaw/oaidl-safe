@@ -6,10 +6,16 @@ use rust_decimal::Decimal;
 
 // use widestring::U16String;
 
+#[cfg(windows)]
 use winapi::ctypes::{c_long, c_void};
 
+#[cfg(windows)]
 use winapi::shared::minwindef::{UINT, ULONG,};
+
+#[cfg(windows)]
 use winapi::shared::ntdef::HRESULT;
+
+#[cfg(windows)]
 use winapi::shared::wtypes::{
     // BSTR,
     CY, 

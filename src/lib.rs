@@ -1,5 +1,5 @@
 #![cfg_attr(feature = "impl_tryfrom", feature(try_from))]
-
+#![cfg(windows)]
 //Enable lints for specific cases
 #![deny(future_incompatible)]
 #![deny(missing_copy_implementations)]
@@ -18,7 +18,7 @@
 #![deny(improper_ctypes)]
 #![deny(overflowing_literals)]
 
-#![doc(html_root_url = "https://docs.rs/oaidl/0.1.1")]
+#![doc(html_root_url = "https://docs.rs/oaidl/0.1.2")]
 //! # Introduction
 //! 
 //! A module to handle conversion to and from common OLE/COM types - VARIANT, SAFEARRAY, and BSTR. 
@@ -81,6 +81,8 @@ extern crate rust_decimal;
 extern crate serde;
 
 extern crate widestring;
+
+
 extern crate winapi;
 
 mod array;
