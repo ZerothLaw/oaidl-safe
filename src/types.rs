@@ -4,7 +4,7 @@
 //!   * CY
 //!   * DATE
 //!   * DECIMAL
-
+//! 
 #[cfg(feature = "impl_tryfrom")]
 use std::convert::{TryFrom};
 
@@ -13,28 +13,140 @@ use std::num::{TryFromIntError};
 
 use rust_decimal::Decimal;
 
-use winapi::shared::wtypes::{CY, DATE, DECIMAL, DECIMAL_NEG, VARIANT_BOOL, VARIANT_TRUE};
+use winapi::shared::wtypes::{CY, DECIMAL, DECIMAL_NEG, VARIANT_BOOL, VARIANT_TRUE};
+
+/// Pseudo-`From` trait because of orphan rules
+trait Conversion<T> {
+    fn convert(val: T) -> Self;
+}
+
+impl<T> Conversion<T> for T where T: From<T>{
+    fn convert(val: T) -> Self {
+        T::from(val)
+    }
+}
+
+macro_rules! wrapper_conv_impl {
+    ($inner:ident, $wrapper:ident) => {
+        impl From<$inner> for $wrapper {
+            fn from(i: $inner) -> Self {
+                $wrapper(i)
+            }
+        }
+
+        impl<'f> From<&'f $inner> for $wrapper {
+            fn from(i: &$inner) -> Self {
+                $wrapper(*i)
+            }
+        }
+
+        impl<'f> From<&'f mut $inner> for $wrapper {
+            fn from(i: &mut $inner) -> Self {
+                $wrapper(*i)
+            }
+        }
+
+        impl From<$wrapper> for $inner {
+            fn from(o: $wrapper) -> Self {
+                o.0
+            }
+        }
+
+        impl<'f> From<&'f $wrapper> for $inner {
+            fn from(o: &$wrapper) -> Self {
+                o.0
+            }
+        }
+
+        impl<'f> From<&'f mut $wrapper> for $inner {
+            fn from(o: &mut $wrapper) -> Self {
+                o.0
+            }
+        }
+
+        impl Conversion<$inner> for $wrapper {
+            fn convert(val: $inner) -> Self {
+                $wrapper::from(val)
+            }
+        }
+
+        impl Conversion<$wrapper> for $inner {
+            fn convert(val: $wrapper) -> Self {
+                $inner::from(val)
+            }
+        }
+
+        impl<'c> Conversion<&'c $inner> for $wrapper {
+            fn convert(val: &$inner) -> Self {
+                $wrapper::from(val)
+            }
+        }
+
+        impl<'c> Conversion<&'c $wrapper> for $inner {
+            fn convert(val: &$wrapper) -> Self {
+                $inner::from(val)
+            }
+        }
+
+        impl<'c> Conversion<&'c mut $inner> for $wrapper {
+            fn convert(val: &mut $inner) -> Self {
+                $wrapper::from(val)
+            }
+        }
+
+        impl<'c> Conversion<&'c mut $wrapper> for $inner {
+            fn convert(val: &mut $wrapper) -> Self {
+                $inner::from(val)
+            }
+        }
+    };
+}
+
+macro_rules! conversions_impl {
+    ($inner:ident, $wrapper:ident) => {
+        impl Conversion<$inner> for $wrapper {
+            fn convert(val: $inner) -> Self {
+                $wrapper::from(val)
+            }
+        }
+
+        impl Conversion<$wrapper> for $inner {
+            fn convert(val: $wrapper) -> Self {
+                $inner::from(val)
+            }
+        }
+
+        impl<'c> Conversion<&'c $inner> for $wrapper {
+            fn convert(val: &$inner) -> Self {
+                $wrapper::from(val)
+            }
+        }
+
+        impl<'c> Conversion<&'c $wrapper> for $inner {
+            fn convert(val: &$wrapper) -> Self {
+                $inner::from(val)
+            }
+        }
+
+        impl<'c> Conversion<&'c mut $inner> for $wrapper {
+            fn convert(val: &mut $inner) -> Self {
+                $wrapper::from(val)
+            }
+        }
+
+        impl<'c> Conversion<&'c mut $wrapper> for $inner {
+            fn convert(val: &mut $wrapper) -> Self {
+                $inner::from(val)
+            }
+        }
+    };
+}
+
 
 /// Helper type for the OLE/COM+ type CY
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, Debug, Eq,  Hash, PartialOrd, PartialEq)]
-pub struct Currency(pub i64);
-
-impl From<i64> for Currency {
-    fn from(i: i64) -> Currency {
-        Currency(i)
-    }
-}
-impl<'i> From<&'i i64> for Currency {
-    fn from(i: &i64) -> Currency {
-        Currency(*i)
-    }
-}
-impl<'i> From<&'i mut i64> for Currency {
-    fn from(i: &mut i64) -> Currency {
-        Currency(*i)
-    }
-}
+pub struct Currency(i64);
 
 impl From<CY> for Currency {
     fn from(cy: CY) -> Currency {
@@ -73,46 +185,13 @@ impl AsRef<i64> for Currency {
         &self.0
     }
 }
-
+wrapper_conv_impl!(i64, Currency);
+conversions_impl!(Currency, CY);
 
 /// Helper type for the OLE/COM+ type DATE
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
-pub struct Date(pub f64); //DATE <--> F64
-
-impl From<DATE> for Date {
-    fn from(f: DATE) -> Date {
-        Date(f)
-    }
-}
-impl<'f> From<&'f DATE> for Date {
-    fn from(f: &DATE) -> Date {
-        Date(*f)
-    }
-}
-impl<'f> From<&'f mut DATE> for Date {
-    fn from(f: &mut DATE) -> Date {
-        Date(*f)
-    }
-}
-
-impl From<Date> for DATE {
-    fn from(d: Date) -> DATE {
-        d.0
-    }
-}
-
-impl<'f> From<&'f Date> for DATE {
-    fn from(d: &Date) -> DATE {
-        d.0
-    }
-}
-
-impl<'f> From<&'f mut Date> for DATE {
-    fn from(d: &mut Date) -> DATE {
-        d.0
-    }
-}
+pub struct Date(f64); //DATE <--> F64
 
 impl AsRef<f64> for Date {
     fn as_ref(&self) -> &f64 {
@@ -120,6 +199,7 @@ impl AsRef<f64> for Date {
     }
 }
 
+wrapper_conv_impl!(f64, Date);
 
 /// Helper type for the OLE/COM+ type DECIMAL
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -264,7 +344,8 @@ impl AsRef<Decimal> for DecWrapper {
         &self.0
     }
 }
-
+conversions_impl!(Decimal, DecWrapper);
+conversions_impl!(DecWrapper, DECIMAL);
 
 /// Helper type for the OLE/COM+ type VARIANT_BOOL
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -343,16 +424,21 @@ impl AsRef<bool> for VariantBool {
     }
 }
 
+conversions_impl!(bool, VariantBool);
+conversions_impl!(VariantBool, VARIANT_BOOL);
+
 /// Helper type for the OLE/COM+ type INT
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Int(pub i32);
+pub struct Int(i32);
 
 impl AsRef<i32> for Int {
     fn as_ref(&self) -> &i32 {
         &self.0
     }
 }
+
+wrapper_conv_impl!(i32, Int);
 
 #[cfg(feature = "impl_tryfrom")]
 impl TryFrom<i64> for Int {
@@ -388,13 +474,15 @@ impl TryFrom<i8> for Int {
 
 /// Helper type for the OLE/COM+ type UINT
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct UInt(pub u32);
+pub struct UInt(u32);
 
 impl AsRef<u32> for UInt {
     fn as_ref(&self) -> &u32 {
         &self.0
     }
 }
+
+wrapper_conv_impl!(u32, UInt);
 
 #[cfg(feature = "impl_tryfrom")]
 impl TryFrom<u64> for UInt {
@@ -431,13 +519,15 @@ impl TryFrom<u8> for UInt {
 /// Helper type for the OLE/COM+ type SCODE
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct SCode(pub i32);
+pub struct SCode(i32);
 
 impl AsRef<i32> for SCode {
     fn as_ref(&self) -> &i32 {
         &self.0
     }
 }
+
+wrapper_conv_impl!(i32, SCode);
 
 #[cfg(test)]
 mod tests {
