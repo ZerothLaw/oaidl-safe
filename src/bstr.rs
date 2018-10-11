@@ -14,21 +14,23 @@ use super::ptr::Ptr;
 //This is how C/Rust look at it, but the memory returned by SysX methods is a bit different
 type BSTR = *mut u16; 
 
-/// This trait is implemented on String to enable the convenient and safe conversion of
+/// This trait is implemented on `String` to enable the convenient and safe conversion of
 /// It utilizes the Sys* functions to manage the allocated memory. 
-/// Generally you will want to use `.allocate_managed_bstr()` because it provides a
+/// Generally you will want to use [`allocate_managed_bstr`] because it provides a
 /// type that will automatically free the BSTR when dropped. 
 /// 
-/// For FFI, you **cannot** use a straight up *mut u16 when an interface calls for a 
+/// For FFI, you **cannot** use a straight up `*mut u16` when an interface calls for a 
 /// BSTR. The reason being is that at the four bytes before where the BSTR pointer points to, 
 /// there is a length prefix. In addition, the memory will be freed by the same allocator used in 
 /// `SysAllocString`, which can cause UB if you didn't allocate the memory that way. **Any** other
 /// allocation method will cause UB and crashes. 
 /// 
+/// [`allocate_managed_bstr`]: #tymethod.allocate_managed_bstr
+/// [`DroppableBString`]: struct.DroppableBString.html
 pub trait BStringExt {
-    /// Allocates a Ptr<u16> (aka a *mut u16 aka a BSTR)
+    /// Allocates a [`Ptr<u16>`] (aka a `*mut u16` aka a BSTR)
     fn allocate_bstr(&mut self) -> Result<Ptr<u16>, BStringError>;
-    /// Allocates a DroppableBString container - automatically frees the memory properly if dropped.
+    /// Allocates a [`DroppableBString`] container - automatically frees the memory properly if dropped.
     fn allocate_managed_bstr(&mut self) -> Result<DroppableBString, BStringError>;
     /// Manually and correct free the memory allocated via Sys* methods
     fn deallocate_bstr(bstr: Ptr<u16>);

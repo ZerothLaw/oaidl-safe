@@ -2,6 +2,10 @@
 
 ## 0.1.5 Release
 
+**Generics**
+Updated `SafeArrayExt` to be implemented on `ExactSizeIterator<Item=SafeArrayElement>`
+This necessitated a change to the interfaces of `.into_safearray` and `.into_variant` from `&mut self` to `self`. This means the original value will be consumed. 
+
 ## 0.1.4 Release (Published) Oct-8-2018
 Initial feature set released. 
 

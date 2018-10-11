@@ -16,7 +16,8 @@ impl<T: Clone> Clone for Ptr<T> {
 }
 
 impl<T> Ptr<T> {
-    /// Wraps a valid `NonNull<T>` 
+    /// Wraps a valid [`NonNull<T>`] 
+    /// [`NonNull<T>`]: https://doc.rust-lang.org/nightly/core/ptr/struct.NonNull.html
     pub fn new(p: NonNull<T>) -> Ptr<T> {
         Ptr { inner: p }
     }
@@ -35,6 +36,14 @@ impl<T> Ptr<T> {
     }
 
     /// Get inner reference
+    /// ## Safety
+    /// 
+    /// The underlying `.as_ref` call is unsafe so this is unsafe as well, 
+    /// in order to propagate the unsafety invariant forward.
+    /// 
+    /// The lifetime of the provided reference is tied to self. 
+    /// 
+    /// If you need an unbound lifetime, use `&*my_ptr.as_ptr()` instead.
     pub unsafe fn as_ref(&self) -> &T {
         self.inner.as_ref()
     }
