@@ -4,26 +4,15 @@ use std::ptr::null_mut;
 
 use rust_decimal::Decimal;
 
-// use widestring::U16String;
-
-#[cfg(windows)]
 use winapi::ctypes::{c_long, c_void};
-
-#[cfg(windows)]
 use winapi::shared::minwindef::{UINT, ULONG,};
-
-#[cfg(windows)]
 use winapi::shared::ntdef::HRESULT;
-
-#[cfg(windows)]
 use winapi::shared::wtypes::{
-    // BSTR,
     CY, 
     DATE, 
     DECIMAL,  
     VARTYPE,
     VARIANT_BOOL,
-    // VT_BSTR, 
     VT_BOOL,
     VT_CY,
     VT_DATE,
@@ -36,7 +25,6 @@ use winapi::shared::wtypes::{
     VT_INT,
     VT_R4, 
     VT_R8, 
-    //VT_RECORD,
     VT_UI1,
     VT_UI2,
     VT_UI4,
@@ -48,7 +36,6 @@ use winapi::shared::wtypes::{
 use winapi::um::oaidl::{IDispatch, LPSAFEARRAY, LPSAFEARRAYBOUND, SAFEARRAY, SAFEARRAYBOUND, VARIANT};
 use winapi::um::unknwnbase::IUnknown;
 
-// use bstr::BStringExt;
 use super::errors::{
     FromSafeArrayError, 
     FromSafeArrElemError, 
@@ -60,25 +47,60 @@ use super::types::{Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool};
 use super::variant::{Variant, VariantExt};
 
 /// Helper trait implemented for types that can be converted into a safe array. 
-/// Generally, don't implement this yourself without care.
+/// 
 /// Implemented for types:
-///     * i8, u8, i16, u16, i32, u32
-///     * bool, f32, f64
-///     * String, Variant<T>, 
-///     * Ptr<IUnknown>, Ptr<IDispatch>
+/// 
+/// * `i8`, `u8`, `i16`, `u16`, `i32`, `u32`
+/// * `bool`, `f32`, `f64`
+/// * `String`, [`Variant<T>`], 
+/// * [`Ptr<IUnknown>`], [`Ptr<IDispatch>`]
+///  
+/// [`Variant<T>`]: struct.Variant.html
+/// [`Ptr<IUnknown>`]: struct.Ptr.html
+/// [`Ptr<IDispatch>`]: struct.Ptr.html
+/// 
+/// ## Example usage
+/// 
+/// Generally, you shouldn't implement this on your types without great care. Therefore this 
+/// example only shows the basic interface, but not implementation details. 
+/// 
+/// ```
+/// extern crate oaidl;
+/// extern crate winapi;
+/// 
+/// use winapi::shared::wtypes::VT_I4;
+/// use winapi::um::oaidl::SAFEARRAY;
+/// 
+/// use oaidl::{SafeArrayElement, IntoSafeArrElemError, FromSafeArrElemError};
+/// 
+/// 
+/// struct Wrapper(i32);
+/// 
+/// impl SafeArrayElement for Wrapper {
+///     const SFTYPE: u32 = VT_I4;
+///     fn into_safearray(self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), IntoSafeArrElemError> {
+///         unimplemented!();
+///     }
+/// 
+///     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self, FromSafeArrElemError> {
+///         unimplemented!();
+///     }
+/// }
+/// ```
 /// 
 pub trait SafeArrayElement: Sized {
     /// This is the VT value used to create the SAFEARRAY
     const SFTYPE: u32;
 
-    /// puts a type into the safearray at the specified index (default impls use SafeArrayPutElement)
+    /// Puts a type into the safearray at the specified index (default impls use SafeArrayPutElement)
     fn into_safearray(self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), IntoSafeArrElemError>;
+    
     /// gets a type from the safearray at the specified index (default impls use SafeArrayGetElement)
     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self, FromSafeArrElemError>;
 }
 
-/// Workhorse trait and main interface for converting to/from SAFEARRAY
-/// Default impl is on `Vec<T: SafeArrayElement>` 
+/// Workhorse trait and main interface for converting to/from SAFEARRAY. 
+/// Default impl is on `ExactSizeIterator<Item=SafeArrayElement>` 
 pub trait SafeArrayExt<T: SafeArrayElement> {
     /// Use `t.into_safearray()` to convert a type into a SAFEARRAY
     fn into_safearray(&mut self) -> Result<Ptr<SAFEARRAY>, IntoSafeArrayError>;
@@ -186,10 +208,6 @@ where I: ExactSizeIterator + ?Sized,
         }
     }
 } 
-
-// impl<'a, T: SafeArrayElement> SafeArrayExt<T> for IterMut<'a, T> {
-
-// }
 
 macro_rules! safe_arr_impl {
     (

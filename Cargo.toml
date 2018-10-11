@@ -8,7 +8,7 @@ repository = "https://github.com/ZerothLaw/oaidl-safe"
 readme = "README.md"
 keywords = ["COM", "interop", "safearray", "variant"]
 categories = ["api-bindings", "development-tools::ffi", "os::windows-apis"]
-documentation = "https://docs.rs/oaidl/0.1.4"
+documentation = "https://docs.rs/oaidl/0.1.4/x86_64-pc-windows-msvc/oaidl/"
 
 [dependencies]
 # mandatory packages

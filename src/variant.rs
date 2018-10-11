@@ -1,3 +1,15 @@
+//! Variant conversions
+//! 
+//! This module contains the trait [`VariantExt`] and the types [`Variant`], [`VtEmpty`], [`VtNull`].
+//! 
+//! It implements [`VariantExt`] for many built in types to enable conversions to VARIANT.  
+//! 
+//! [`VariantExt`]: trait.VariantExt.html
+//! [`Variant`]: struct.Variant.html
+//! [`VtEmpty`]: struct.VtEmpty.html
+//! [`VtNull`]: struct.VtNull.html
+
+/*
 /// 
 /// Reference:
 /// typedef struct tagVARIANT {
@@ -59,7 +71,7 @@
 ///         } __VARIANT_NAME_2;
 ///         DECIMAL decVal;
 ///     } __VARIANT_NAME_1;
-/// } VARIANT;
+/// } VARIANT;*/
 /*
 * VARENUM usage key,
 *
@@ -168,26 +180,26 @@ use super::errors::{IntoVariantError, FromVariantError};
 use super::ptr::Ptr;
 use super::types::{Date, DecWrapper, Currency, Int, SCode, UInt, VariantBool };
 
-const VT_PUI1: u32 = VT_BYREF | VT_UI1;
-const VT_PI2: u32 = VT_BYREF | VT_I2;
-const VT_PI4: u32 = VT_BYREF | VT_I4;
-const VT_PI8: u32 = VT_BYREF | VT_I8;
-const VT_PUI8: u32 = VT_BYREF | VT_UI8;
-const VT_PR4: u32 = VT_BYREF | VT_R4;
-const VT_PR8: u32 = VT_BYREF | VT_R8;
-const VT_PBOOL: u32 = VT_BYREF | VT_BOOL;
-const VT_PERROR: u32 = VT_BYREF | VT_ERROR;
-const VT_PCY: u32 = VT_BYREF | VT_CY;
-const VT_PDATE: u32 = VT_BYREF | VT_DATE;
-const VT_PBSTR: u32 = VT_BYREF | VT_BSTR;
-const VT_PUNKNOWN: u32 = VT_BYREF | VT_UNKNOWN;
+const VT_PUI1:      u32 = VT_BYREF | VT_UI1;
+const VT_PI2:       u32 = VT_BYREF | VT_I2;
+const VT_PI4:       u32 = VT_BYREF | VT_I4;
+const VT_PI8:       u32 = VT_BYREF | VT_I8;
+const VT_PUI8:      u32 = VT_BYREF | VT_UI8;
+const VT_PR4:       u32 = VT_BYREF | VT_R4;
+const VT_PR8:       u32 = VT_BYREF | VT_R8;
+const VT_PBOOL:     u32 = VT_BYREF | VT_BOOL;
+const VT_PERROR:    u32 = VT_BYREF | VT_ERROR;
+const VT_PCY:       u32 = VT_BYREF | VT_CY;
+const VT_PDATE:     u32 = VT_BYREF | VT_DATE;
+const VT_PBSTR:     u32 = VT_BYREF | VT_BSTR;
+const VT_PUNKNOWN:  u32 = VT_BYREF | VT_UNKNOWN;
 const VT_PDISPATCH: u32 = VT_BYREF | VT_DISPATCH;
-const VT_PDECIMAL: u32 = VT_BYREF | VT_DECIMAL;
-const VT_PI1: u32 = VT_BYREF | VT_I1;
-const VT_PUI2: u32 = VT_BYREF | VT_UI2;
-const VT_PUI4: u32 = VT_BYREF | VT_UI4;
-const VT_PINT: u32 = VT_BYREF | VT_INT;
-const VT_PUINT: u32 = VT_BYREF | VT_UINT;
+const VT_PDECIMAL:  u32 = VT_BYREF | VT_DECIMAL;
+const VT_PI1:       u32 = VT_BYREF | VT_I1;
+const VT_PUI2:      u32 = VT_BYREF | VT_UI2;
+const VT_PUI4:      u32 = VT_BYREF | VT_UI4;
+const VT_PINT:      u32 = VT_BYREF | VT_INT;
+const VT_PUINT:     u32 = VT_BYREF | VT_UINT;
 
 /// Trait implemented to convert the type into a VARIANT
 /// Do not implement this yourself without care. 
@@ -504,24 +516,21 @@ variant_impl!{
         into => {|slf: Ptr<IUnknown>| -> Result<_, IntoVariantError> {Ok(slf.as_ptr())}}
     }
 }
-// variant_impl!{
-//     impl VariantExt for Ptr<IDispatch> {
-//         VARTYPE = VT_DISPATCH;
-//         n3, pdispVal, pdispVal_mut
-//         from => {|n_ptr: &*mut IDispatch| Ok(Ptr::with_checked(*n_ptr).unwrap())}
-//         into => {|slf: Ptr<IDispatch>| -> Result<*mut *mut IDispatch, IntoVariantError> {
-//             let mut p = slf.as_ptr();
-//             Ok(&mut p)    
-//         }}
-//     }
-// }
+variant_impl!{
+    impl VariantExt for Ptr<IDispatch> {
+        VARTYPE = VT_DISPATCH;
+        n3, pdispVal, pdispVal_mut
+        from => {|n_ptr: &*mut IDispatch| Ok(Ptr::with_checked(*n_ptr).unwrap())}
+        into => {|slf: Ptr<IDispatch>| -> Result<_, IntoVariantError> { Ok(slf.as_ptr()) }}
+    }
+}
 variant_impl!{
     impl VariantExt for Box<u8> {
         VARTYPE = VT_PUI1;
         n3, pbVal, pbVal_mut
         from => {|n_ptr: &* mut u8| Ok(Box::new(**n_ptr))}
         into => {|slf: Box<u8>| -> Result<_, IntoVariantError> {
-            Ok(Box::into_raw(slf.clone()))
+            Ok(Box::into_raw(slf))
         }}
     }
 }
@@ -531,7 +540,7 @@ variant_impl!{
         n3, piVal, piVal_mut
         from => {|n_ptr: &* mut i16| Ok(Box::new(**n_ptr))}
         into => {|slf: Box<i16>| -> Result<_, IntoVariantError> {
-            Ok(Box::into_raw(slf.clone()))
+            Ok(Box::into_raw(slf))
         }}
     }
 }
@@ -541,7 +550,7 @@ variant_impl!{
         n3, plVal, plVal_mut
         from => {|n_ptr: &* mut i32| Ok(Box::new(**n_ptr))}
         into => {|slf: Box<i32>| -> Result<_, IntoVariantError> {
-            Ok(Box::into_raw(slf.clone()))
+            Ok(Box::into_raw(slf))
         }}
     }
 }
@@ -551,7 +560,7 @@ variant_impl!{
         n3, pllVal, pllVal_mut
         from => {|n_ptr: &* mut i64| Ok(Box::new(**n_ptr))}
         into => {|slf: Box<i64>| -> Result<_, IntoVariantError> {
-            Ok(Box::into_raw(slf.clone()))
+            Ok(Box::into_raw(slf))
         }}
     }
 }
@@ -561,7 +570,7 @@ variant_impl!{
         n3, pfltVal, pfltVal_mut
         from => {|n_ptr: &* mut f32| Ok(Box::new(**n_ptr))}
         into => {|slf: Box<f32>| -> Result<_, IntoVariantError> {
-            Ok(Box::into_raw(slf.clone()))
+            Ok(Box::into_raw(slf))
         }}
     }
 }
@@ -571,7 +580,7 @@ variant_impl!{
         n3, pdblVal, pdblVal_mut
         from => {|n_ptr: &* mut f64| Ok(Box::new(**n_ptr))}
         into => {|slf: Box<f64>| -> Result<_, IntoVariantError> {
-            Ok(Box::into_raw(slf.clone()))
+            Ok(Box::into_raw(slf))
         }}
     }
 }

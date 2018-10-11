@@ -5,6 +5,8 @@
 //!   * DATE
 //!   * DECIMAL
 //! 
+use std::fmt;
+
 #[cfg(feature = "impl_tryfrom")]
 use std::convert::{TryFrom};
 
@@ -438,6 +440,30 @@ impl AsRef<i32> for Int {
     }
 }
 
+impl fmt::UpperHex for Int {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:X}", self.0)
+    }
+}
+
+impl fmt::LowerHex for Int {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:x}", self.0)
+    }
+}
+
+impl fmt::Octal for Int {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:o}", self.0)
+    }
+}
+
+impl fmt::Binary for Int {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:b}", self.0)
+    }
+}
+
 wrapper_conv_impl!(i32, Int);
 
 #[cfg(feature = "impl_tryfrom")]
@@ -482,6 +508,31 @@ impl AsRef<u32> for UInt {
     }
 }
 
+impl fmt::UpperHex for UInt {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:X}", self.0)
+    }
+}
+
+impl fmt::LowerHex for UInt {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:x}", self.0)
+    }
+}
+
+impl fmt::Octal for UInt {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:o}", self.0)
+    }
+}
+
+impl fmt::Binary for UInt {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:b}", self.0)
+    }
+}
+
+
 wrapper_conv_impl!(u32, UInt);
 
 #[cfg(feature = "impl_tryfrom")]
@@ -524,6 +575,30 @@ pub struct SCode(i32);
 impl AsRef<i32> for SCode {
     fn as_ref(&self) -> &i32 {
         &self.0
+    }
+}
+
+impl fmt::UpperHex for SCode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "0X{:X}", self.0)
+    }
+}
+
+impl fmt::LowerHex for SCode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "0x{:x}", self.0)
+    }
+}
+
+impl fmt::Octal for SCode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:o}", self.0)
+    }
+}
+
+impl fmt::Binary for SCode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:b}", self.0)
     }
 }
 
