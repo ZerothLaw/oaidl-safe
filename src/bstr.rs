@@ -1,10 +1,12 @@
 use std::ptr::null_mut;
 
 use winapi::um::oleauto::{SysAllocStringLen, SysFreeString, SysStringLen};
-use widestring::U16String;
+use winapi::shared::wtypes::BSTR;
+pub(crate) use widestring::U16String;
 
 use super::errors::BStringError;
 use super::ptr::Ptr;
+use super::types::Conversion;
 
 // pub type wchar_t = u16;
 // pub type WCHAR = wchar_t;
@@ -12,7 +14,7 @@ use super::ptr::Ptr;
 // pub type BSTR = *mut OLECHAR;
 
 //This is how C/Rust look at it, but the memory returned by SysX methods is a bit different
-type BSTR = *mut u16; 
+//type BSTR = *mut u16; 
 
 /// This trait is implemented on `String` to enable the convenient and safe conversion of
 /// It utilizes the Sys* functions to manage the allocated memory. 
@@ -110,5 +112,62 @@ impl Drop for DroppableBString {
             }, 
             None => {}
         }
+    }
+}
+
+impl Conversion<String> for U16String {
+    fn convert(s: String) -> Self {
+        U16String::from_str(&s)
+    }
+}
+
+impl<'s> Conversion<&'s str> for U16String {
+    fn convert(s: &str) -> Self {
+        U16String::from_str(s)
+    }
+}
+
+impl Conversion<U16String> for String {
+    fn convert(u: U16String) -> Self {
+        u.to_string_lossy()
+    }
+}
+
+impl Conversion<U16String> for BSTR {
+    fn convert(u: U16String) -> Self {
+        u.clone().allocate_bstr().unwrap().as_ptr()
+    }
+}
+
+impl Conversion<BSTR> for U16String {
+    fn convert(p: BSTR) -> Self {
+        U16String::from_bstr(p)
+    }
+}
+
+impl Conversion<Box<String>> for Box<U16String> {
+    fn convert(b: Box<String>) -> Self {
+        Box::new(U16String::convert(*b))
+    }
+}
+
+impl Conversion<Box<U16String>> for Box<String> {
+    fn convert(b: Box<U16String>) -> Self {
+        Box::new(String::convert(*b))
+    }
+}
+
+impl Conversion<Box<U16String>> for *mut BSTR {
+    fn convert(b: Box<U16String>) -> Self {
+        let u = *b;
+        let p = Box::new(BSTR::convert(u));
+        Box::into_raw(p)
+    }
+}
+
+impl Conversion<*mut BSTR> for  Box<U16String>   {
+    fn convert(b: *mut BSTR) -> Self {
+        assert!(!b.is_null());
+        Box::new(U16String::convert(unsafe {*b}))
     }
 }

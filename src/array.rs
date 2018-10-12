@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ptr::null_mut;
 
+
 use rust_decimal::Decimal;
 
 use winapi::ctypes::{c_long, c_void};
@@ -30,10 +31,10 @@ use winapi::shared::wtypes::{
     VT_UI4,
     VT_UINT,
     VT_UNKNOWN, 
-    VT_VARIANT,   
+    //VT_VARIANT,   
 };
 
-use winapi::um::oaidl::{IDispatch, LPSAFEARRAY, LPSAFEARRAYBOUND, SAFEARRAY, SAFEARRAYBOUND, VARIANT};
+use winapi::um::oaidl::{IDispatch, LPSAFEARRAY, LPSAFEARRAYBOUND, SAFEARRAY, SAFEARRAYBOUND, /*VARIANT*/};
 use winapi::um::unknwnbase::IUnknown;
 
 use super::errors::{
@@ -44,7 +45,7 @@ use super::errors::{
 };
 use super::ptr::Ptr;
 use super::types::{Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool};
-use super::variant::{Variant, VariantExt};
+//use super::variant::VariantExt;
 
 /// Helper trait implemented for types that can be converted into a safe array. 
 /// 
@@ -146,7 +147,7 @@ impl Drop for SafeArrayDestructor {
 }
 
 impl<I> SafeArrayExt<I::Item> for I 
-where I: ExactSizeIterator + ?Sized, 
+where I: ExactSizeIterator, 
       I::Item: SafeArrayElement
 {
     fn into_safearray(&mut self) -> Result<Ptr<SAFEARRAY>, IntoSafeArrayError > {
@@ -296,34 +297,34 @@ safe_arr_impl!{impl SafeArrayElement for Date{
     into => { |slf: Date| -> Result<_, IntoSafeArrElemError> {Ok(DATE::from(slf)) }}
 }}
 // Need to wrap the string in a variant because its not working otherwise. 
-safe_arr_impl!{impl SafeArrayElement for String {
-    SFTYPE = VT_VARIANT;
-    ptr
-    def => {{
-        let mut var: VARIANT = unsafe {mem::zeroed()};
-        &mut var as *mut VARIANT
-    }}
-    from => {|pvar| {
-        let pnn = match Ptr::with_checked(pvar) {
-            Some(nn) => nn, 
-            None => return Err(FromSafeArrElemError::VariantPtrNull)
-        };
-        match Variant::<String>::from_variant(pnn) {
-            Ok(var) => Ok(var.unwrap()), 
-            Err(_) => return Err(FromSafeArrElemError::FromVariantFailed)
-        }
-    }}
-    into => {|slf: String|{
-        let slf = Variant::new(slf);
-        match slf.into_variant() {
-            Ok(slf) => {
-                let mut s = slf.as_ptr();
-                Ok(s)
-            }, 
-            Err(ive) => Err(IntoSafeArrElemError::from(ive))
-        }
-    }}
-}}
+// safe_arr_impl!{impl SafeArrayElement for String {
+//     SFTYPE = VT_VARIANT;
+//     ptr
+//     def => {{
+//         let mut var: VARIANT = unsafe {mem::zeroed()};
+//         &mut var as *mut VARIANT
+//     }}
+//     from => {|pvar| {
+//         let pnn = match Ptr::with_checked(pvar) {
+//             Some(nn) => nn, 
+//             None => return Err(FromSafeArrElemError::VariantPtrNull)
+//         };
+//         match Variant::<String>::from_variant(pnn) {
+//             Ok(var) => Ok(var.unwrap()), 
+//             Err(_) => return Err(FromSafeArrElemError::FromVariantFailed)
+//         }
+//     }}
+//     into => {|slf: String|{
+//         let slf = Variant::new(slf);
+//         match slf.into_variant() {
+//             Ok(slf) => {
+//                 let mut s = slf.as_ptr();
+//                 Ok(s)
+//             }, 
+//             Err(ive) => Err(IntoSafeArrElemError::from(ive))
+//         }
+//     }}
+// }}
 safe_arr_impl!{impl SafeArrayElement for Ptr<IDispatch>{
     SFTYPE = VT_DISPATCH; 
     ptr
@@ -353,33 +354,33 @@ safe_arr_impl!{impl SafeArrayElement for bool {
         |slf: bool| -> Result<_, IntoSafeArrElemError> { Ok(VARIANT_BOOL::from(VariantBool::from(slf)))}
     }
 }}
-safe_arr_impl!{impl <T: VariantExt> SafeArrayElement for Variant<T> {
-    SFTYPE = VT_VARIANT;
-    ptr
-    def => {{
-        let mut var: VARIANT = unsafe {mem::zeroed()};
-        &mut var as *mut VARIANT
-    }}
-    from => {|pvar| {
-        let pnn = match Ptr::with_checked(pvar) {
-            Some(nn) => nn, 
-            None => return Err(FromSafeArrElemError::VariantPtrNull)
-        };
-        match Variant::<T>::from_variant(pnn) {
-            Ok(var) => Ok(var), 
-            Err(_) => Err(FromSafeArrElemError::FromVariantFailed)
-        }
-    }}
-    into => {|slf: Variant<T>| -> Result<*mut VARIANT, IntoSafeArrElemError>{
-        match slf.into_variant() {
-            Ok(slf) => {
-                let mut s = slf.as_ptr();
-                Ok(s)
-            }, 
-            Err(ive) => Err(IntoSafeArrElemError::from(ive))
-        }
-    }}
-}}
+// safe_arr_impl!{impl <T: VariantExt> SafeArrayElement for Variant<T> {
+//     SFTYPE = VT_VARIANT;
+//     ptr
+//     def => {{
+//         let mut var: VARIANT = unsafe {mem::zeroed()};
+//         &mut var as *mut VARIANT
+//     }}
+//     from => {|pvar| {
+//         let pnn = match Ptr::with_checked(pvar) {
+//             Some(nn) => nn, 
+//             None => return Err(FromSafeArrElemError::VariantPtrNull)
+//         };
+//         match Variant::<T>::from_variant(pnn) {
+//             Ok(var) => Ok(var), 
+//             Err(_) => Err(FromSafeArrElemError::FromVariantFailed)
+//         }
+//     }}
+//     into => {|slf: Variant<T>| -> Result<*mut VARIANT, IntoSafeArrElemError>{
+//         match slf.into_variant() {
+//             Ok(slf) => {
+//                 let mut s = slf.as_ptr();
+//                 Ok(s)
+//             }, 
+//             Err(ive) => Err(IntoSafeArrElemError::from(ive))
+//         }
+//     }}
+// }}
 safe_arr_impl!{impl SafeArrayElement for Ptr<IUnknown> {
     SFTYPE = VT_UNKNOWN; 
     ptr
@@ -478,13 +479,14 @@ extern "system" {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::vec::IntoIter;
     macro_rules! validate_safe_arr {
         ($t:ident, $vals:expr, $vt:expr) => {
             let v: Vec<$t> = $vals;
 
             let p = v.into_iter().into_safearray().unwrap();
             
-            let r = ExactSizeIterator::<Item=$t>::from_safearray(p.as_ptr());
+            let r: Result<Vec<$t>, FromSafeArrayError> = IntoIter::<$t>::from_safearray(p.as_ptr());
             let r = r.unwrap();
             assert_eq!(r, $vals);
         };
@@ -514,17 +516,17 @@ mod test {
         validate_safe_arr!(Date, vec![Date::from(0.01), Date::from(100.0/99.0)], VT_DATE );
     }
 
-    #[test]
-    fn test_str() {
-        let v: Vec<String> = vec![String::from("validate"), String::from("test string")];
+    // #[test]
+    // fn test_str() {
+    //     let v: Vec<String> = vec![String::from("validate"), String::from("test string")];
 
-        let p = v.into_iter().into_safearray().unwrap();
+    //     let p = v.into_iter().into_safearray().unwrap();
 
-        let r = ExactSizeIterator::<Item=String>::from_safearray(p.as_ptr());
+    //     let r = ExactSizeIterator::<Item=String>::from_safearray(p.as_ptr());
 
-        let r = r.unwrap();
-        assert_eq!(r, vec![String::from("validate"), String::from("test string")]);
-    }
+    //     let r = r.unwrap();
+    //     assert_eq!(r, vec![String::from("validate"), String::from("test string")]);
+    // }
 
     #[test]
     fn test_scode() {
@@ -535,16 +537,16 @@ mod test {
         validate_safe_arr!(bool, vec![true, false, true, true, false, false, true], VT_BOOL );
     }
 
-    #[test]
-    fn test_variant() {
-        let v: Vec<Variant<u64>> = vec![Variant::new(100u64), Variant::new(100u64), Variant::new(103u64)];
+    // #[test]
+    // fn test_variant() {
+    //     let v: Vec<Variant<u64>> = vec![Variant::new(100u64), Variant::new(100u64), Variant::new(103u64)];
 
-        let p = v.into_iter().into_safearray().unwrap();
+    //     let p = v.into_iter().into_safearray().unwrap();
         
-        let r = ExactSizeIterator::<Item=Variant<u64>>::from_safearray(p.as_ptr());
-        let r = r.unwrap();
-        assert_eq!(r,  vec![Variant::new(100u64), Variant::new(100u64), Variant::new(103u64)]);
-    }
+    //     let r = ExactSizeIterator::<Item=Variant<u64>>::from_safearray(p.as_ptr());
+    //     let r = r.unwrap();
+    //     assert_eq!(r,  vec![Variant::new(100u64), Variant::new(100u64), Variant::new(103u64)]);
+    // }
 
     #[test]
     fn test_decimal() {
@@ -567,15 +569,15 @@ mod test {
         validate_safe_arr!(u32, vec![0,1,2,3,4], VT_UI4 );
     }
 
-    #[test]
-    fn test_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<Variant<i64>>();
-    }
+    // #[test]
+    // fn test_send() {
+    //     fn assert_send<T: Send>() {}
+    //     assert_send::<Variant<i64>>();
+    // }
 
-    #[test]
-    fn test_sync() {
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<Variant<i64>>();
-    }
+    // #[test]
+    // fn test_sync() {
+    //     fn assert_sync<T: Sync>() {}
+    //     assert_sync::<Variant<i64>>();
+    // }
 }

@@ -42,8 +42,10 @@
 //! 
 //! ```rust
 //! extern crate oaidl;
+//! extern crate widestring;
 //! extern crate winapi;
 //! 
+//! use widestring::U16String;
 //! use winapi::um::oaidl::VARIANT;
 //! 
 //! use oaidl::{VariantExt};
@@ -61,11 +63,11 @@
 //! fn main() {
 //!     let mut u = 1337u32;
 //!     let mut sr = String::from("Turing completeness.");
-//!     let p = match u.into_variant() {
+//!     let p = match <u32 as VariantExt<u32>>::into_variant(u) {
 //!         Ok(pvar) => pvar, 
 //!         Err(ex) => panic!(ex),
 //!     };
-//!     let s = match sr.into_variant() {
+//!     let s = match <String as VariantExt<U16String>>::into_variant(sr) {
 //!         Ok(pvar) => pvar, 
 //!         Err(ex) => panic!(ex)
 //!     };
@@ -100,4 +102,5 @@ pub use self::bstr::{BStringExt, DroppableBString};
 pub use self::errors::*;
 pub use self::ptr::Ptr;
 pub use self::types::{Currency, Date, DecWrapper,Int, SCode, UInt, VariantBool};
-pub use self::variant::{Variant, VariantExt, VtEmpty, VtNull};
+pub use self::variant::VariantExt;
+//pub use self::variant::{Variant, VariantExt, VtEmpty, VtNull};

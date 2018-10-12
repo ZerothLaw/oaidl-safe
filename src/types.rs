@@ -18,7 +18,7 @@ use rust_decimal::Decimal;
 use winapi::shared::wtypes::{CY, DECIMAL, DECIMAL_NEG, VARIANT_BOOL, VARIANT_TRUE};
 
 /// Pseudo-`From` trait because of orphan rules
-trait Conversion<T> {
+pub trait Conversion<T> {
     fn convert(val: T) -> Self;
 }
 
@@ -144,6 +144,27 @@ macro_rules! conversions_impl {
     };
 }
 
+macro_rules! impl_conv_for_box_wrapper {
+    ($wrapper:ident, $inner:ident) => {
+        impl Conversion<Box<$wrapper>> for *mut $inner {
+            fn convert(b: Box<$wrapper>) -> Self {
+                let b = *b;
+                let inner = $inner::from(b);
+                Box::into_raw(Box::new(inner))
+            }
+        }
+
+        impl Conversion<*mut $inner> for Box<$wrapper> {
+            fn convert(inner: *mut $inner) -> Self {
+                assert!(!inner.is_null());
+                let inner = unsafe {*inner};
+                let wrapper = $wrapper::from(inner);
+                Box::new(wrapper)
+            }
+        }
+    };
+}
+
 
 /// Helper type for the OLE/COM+ type CY
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -189,6 +210,7 @@ impl AsRef<i64> for Currency {
 }
 wrapper_conv_impl!(i64, Currency);
 conversions_impl!(Currency, CY);
+impl_conv_for_box_wrapper!(Currency, CY);
 
 /// Helper type for the OLE/COM+ type DATE
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -202,7 +224,7 @@ impl AsRef<f64> for Date {
 }
 
 wrapper_conv_impl!(f64, Date);
-
+impl_conv_for_box_wrapper!(Date, f64);
 /// Helper type for the OLE/COM+ type DECIMAL
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -429,6 +451,49 @@ impl AsRef<bool> for VariantBool {
 conversions_impl!(bool, VariantBool);
 conversions_impl!(VariantBool, VARIANT_BOOL);
 
+impl Conversion<Box<bool>> for *mut VARIANT_BOOL {
+    fn convert(b: Box<bool>) -> Self {
+        let b = *b;
+        let vb = VARIANT_BOOL::from(b);
+        Box::into_raw(Box::new(vb))
+    }
+}
+
+impl Conversion<*mut VARIANT_BOOL> for Box<bool> {
+    fn convert(p: *mut VARIANT_BOOL) -> Self {
+        assert!(!p.is_null());
+        Box::new(bool::from(VariantBool::from(unsafe{*p})))
+    }
+}
+
+impl Conversion<Box<VariantBool>> for Box<bool> {
+    fn convert(b: Box<VariantBool>) -> Self {
+        Box::new(bool::convert(*b))
+    }
+}
+
+impl Conversion<Box<bool>> for Box<VariantBool> {
+    fn convert(b: Box<bool>) -> Self {
+        Box::new(VariantBool::convert(*b))
+    }
+}
+
+impl Conversion<Box<VariantBool>> for *mut VARIANT_BOOL {
+    fn convert(b: Box<VariantBool>) -> Self {
+        let b = *b;
+        let vb = VARIANT_BOOL::from(b);
+        Box::into_raw(Box::new(vb))
+    }
+}
+
+impl Conversion<*mut VARIANT_BOOL> for Box<VariantBool> {
+    fn convert(p: *mut VARIANT_BOOL) -> Self {
+        assert!(!p.is_null());
+        Box::new(VariantBool::from(unsafe{*p}))
+    }
+}
+
+
 /// Helper type for the OLE/COM+ type INT
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -465,6 +530,7 @@ impl fmt::Binary for Int {
 }
 
 wrapper_conv_impl!(i32, Int);
+impl_conv_for_box_wrapper!(Int, i32);
 
 #[cfg(feature = "impl_tryfrom")]
 impl TryFrom<i64> for Int {
@@ -532,8 +598,8 @@ impl fmt::Binary for UInt {
     }
 }
 
-
 wrapper_conv_impl!(u32, UInt);
+impl_conv_for_box_wrapper!(UInt, u32);
 
 #[cfg(feature = "impl_tryfrom")]
 impl TryFrom<u64> for UInt {
@@ -603,6 +669,7 @@ impl fmt::Binary for SCode {
 }
 
 wrapper_conv_impl!(i32, SCode);
+impl_conv_for_box_wrapper!(SCode, i32);
 
 #[cfg(test)]
 mod tests {
