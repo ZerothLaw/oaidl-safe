@@ -140,7 +140,7 @@ use widestring::U16String;
 
 use winapi::ctypes::c_void;
 use winapi::shared::wtypes::{
-    CY, DATE, DECIMAL,
+    BSTR, CY, DATE, DECIMAL,
     VARIANT_BOOL,
     VT_ARRAY, 
     VT_BSTR, 
@@ -200,6 +200,157 @@ const VT_PUI2:      u32 = VT_BYREF | VT_UI2;
 const VT_PUI4:      u32 = VT_BYREF | VT_UI4;
 const VT_PINT:      u32 = VT_BYREF | VT_INT;
 const VT_PUINT:     u32 = VT_BYREF | VT_UINT;
+
+mod private {
+    use super::*;
+    #[doc(hidden)]
+    pub trait VariantAccess: Sized {
+        #[doc(hidden)]
+        const VTYPE: u32;
+        type Field;
+
+        #[doc(hidden)]
+        fn from_variant(n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field;
+        
+        #[doc(hidden)]
+        fn into_variant(inner: Self::Field, n1: &mut VARIANT_n1, n3: &mut VARIANT_n3);
+    }
+
+    macro_rules! impl_conversions {
+        ($t:ty, $f:ty, $vtype:ident, $member:ident, $member_mut:ident) => {
+            impl VariantAccess for $t {
+                const VTYPE: u32 = $vtype;
+                type Field = $f;
+                fn from_variant(_n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field {
+                    unsafe {*n3.$member()}
+                }
+                
+                fn into_variant(inner: Self::Field, _n1: &mut VARIANT_n1, n3: &mut VARIANT_n3) {
+                    unsafe {
+                        let n_ptr = n3.$member_mut();
+                        *n_ptr = inner
+                    }
+                }
+            }
+
+            impl<'s> VariantAccess for &'s $t {
+                const VTYPE: u32 = $vtype;
+                type Field = $f;
+                fn from_variant(_n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field {
+                    unsafe {*n3.$member()}
+                }
+                
+                fn into_variant(inner: Self::Field, _n1: &mut VARIANT_n1, n3: &mut VARIANT_n3) {
+                    unsafe {
+                        let n_ptr = n3.$member_mut();
+                        *n_ptr = inner
+                    }
+                }
+            }
+
+            impl<'s> VariantAccess for &'s mut $t {
+                const VTYPE: u32 = $vtype;
+                type Field = $f;
+                fn from_variant(_n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field {
+                    unsafe {*n3.$member()}
+                }
+                
+                fn into_variant(inner: Self::Field, _n1: &mut VARIANT_n1, n3: &mut VARIANT_n3) {
+                    unsafe {
+                        let n_ptr = n3.$member_mut();
+                        *n_ptr = inner
+                    }
+                }
+            }
+        };
+    }
+
+    impl_conversions!(i64, i64, VT_I8, llVal, llVal_mut);
+    impl_conversions!(i32, i32, VT_I4, lVal, lVal_mut);
+    impl_conversions!(u8, u8, VT_UI1,  bVal, bVal_mut);
+    impl_conversions!(i16, i16, VT_I2, iVal, iVal_mut);
+    impl_conversions!(f32, f32, VT_R4, fltVal, fltVal_mut);
+    impl_conversions!(f64, f64, VT_R8, dblVal, dblVal_mut);
+    impl_conversions!(VariantBool, VARIANT_BOOL, VT_BOOL, boolVal, boolVal_mut);
+    impl_conversions!(bool, VARIANT_BOOL, VT_BOOL, boolVal, boolVal_mut);
+    impl_conversions!(SCode, SCODE, VT_ERROR, scode, scode_mut);
+    impl_conversions!(Currency, CY, VT_CY, cyVal, cyVal_mut);
+    impl_conversions!(Date, DATE, VT_DATE, date, date_mut);
+    impl_conversions!(U16String, BSTR, VT_BSTR, bstrVal, bstrVal_mut);
+    impl_conversions!(Ptr<IUnknown>, *mut IUnknown, VT_UNKNOWN, punkVal, punkVal_mut);
+    impl_conversions!(Ptr<IDispatch>, *mut IDispatch, VT_DISPATCH,  pdispVal, pdispVal_mut);
+    impl_conversions!(Box<u8>, *mut u8,  VT_PUI1, pbVal, pbVal_mut);
+    impl_conversions!(Box<i16>, *mut i16, VT_PI2,  piVal, piVal_mut);
+    impl_conversions!(Box<i32>, *mut i32, VT_PI4, plVal, plVal_mut);
+    impl_conversions!(Box<i64>, *mut i64, VT_PI8, pllVal, pllVal_mut);
+    impl_conversions!(Box<f32>, *mut f32, VT_PR4, pfltVal, pfltVal_mut);
+    impl_conversions!(Box<f64>, *mut f64, VT_PR8, pdblVal, pdblVal_mut);
+    impl_conversions!(Box<VariantBool>, *mut VARIANT_BOOL, VT_PBOOL, pboolVal, pboolVal_mut);
+    impl_conversions!(Box<SCode>, *mut SCODE, VT_PERROR, pscode, pscode_mut);
+    impl_conversions!(Box<Currency>, *mut CY, VT_PCY, pcyVal, pcyVal_mut);
+    impl_conversions!(Box<Date>, *mut DATE, VT_PDATE, pdate, pdate_mut);
+    impl_conversions!(Box<U16String>, *mut BSTR, VT_PBSTR, pbstrVal, pbstrVal_mut);
+    impl_conversions!(Box<Ptr<IUnknown>>, *mut *mut IUnknown,  VT_PUNKNOWN, ppunkVal, ppunkVal_mut);
+    impl_conversions!(Box<Ptr<IDispatch>>, *mut *mut IDispatch, VT_PDISPATCH, ppdispVal, ppdispVal_mut);
+    impl_conversions!(Box<c_void>, *mut c_void, VT_BYREF, byref, byref_mut);
+    impl_conversions!(i8, i8, VT_I1, cVal, cVal_mut);
+    impl_conversions!(u16, u16, VT_UI2, uiVal, uiVal_mut);
+    impl_conversions!(u32, u32, VT_UI4, ulVal, ulVal_mut);
+    impl_conversions!(u64, u64, VT_UI8, ullVal, ullVal_mut);
+    impl_conversions!(Int, i32, VT_INT, intVal, intVal_mut);
+    impl_conversions!(UInt, u32, VT_UINT, uintVal, uintVal_mut);
+    impl_conversions!(Box<DecWrapper>, *mut DECIMAL, VT_PDECIMAL, pdecVal, pdecVal_mut);
+    impl_conversions!(Box<i8>, *mut i8, VT_PI1, pcVal, pcVal_mut);
+    impl_conversions!(Box<u16>, *mut u16, VT_PUI2,  puiVal, puiVal_mut);
+    impl_conversions!(Box<u32>, *mut u32, VT_PUI4, pulVal, pulVal_mut);
+    impl_conversions!(Box<u64>, *mut u64, VT_PUI8, pullVal, pullVal_mut);
+    impl_conversions!(Box<Int>, *mut i32, VT_PINT, pintVal, pintVal_mut);
+    impl_conversions!(Box<UInt>, *mut u32, VT_PUINT, puintVal, puintVal_mut);
+    impl VariantAccess for DecWrapper {
+        const VTYPE: u32 = VT_DECIMAL;
+        type Field = DECIMAL;
+        fn from_variant(n1: &VARIANT_n1, _n3: &VARIANT_n3) -> Self::Field {
+            unsafe {*n1.decVal()}
+        }
+        
+        fn into_variant(inner: Self::Field, n1: &mut VARIANT_n1, _n3: &mut VARIANT_n3) {
+            unsafe {
+                let n_ptr = n1.decVal_mut();
+                *n_ptr = inner;
+            }
+        }
+    }
+
+    impl<'s> VariantAccess for &'s DecWrapper {
+        const VTYPE: u32 = VT_DECIMAL;
+        type Field = DECIMAL;
+        fn from_variant(n1: &VARIANT_n1, _n3: &VARIANT_n3) -> Self::Field {
+            unsafe {*n1.decVal()}
+        }
+        
+        fn into_variant(inner: Self::Field, n1: &mut VARIANT_n1, _n3: &mut VARIANT_n3) {
+            unsafe {
+                let n_ptr = n1.decVal_mut();
+                *n_ptr = inner;
+            }
+        }
+    }
+
+    impl<'s> VariantAccess for &'s mut DecWrapper {
+        const VTYPE: u32 = VT_DECIMAL;
+        type Field = DECIMAL;
+        fn from_variant(n1: &VARIANT_n1, _n3: &VARIANT_n3) -> Self::Field {
+            unsafe {*n1.decVal()}
+        }
+        
+        fn into_variant(inner: Self::Field, n1: &mut VARIANT_n1, _n3: &mut VARIANT_n3) {
+            unsafe {
+                let n_ptr = n1.decVal_mut();
+                *n_ptr = inner;
+            }
+        }
+    }
+}
 
 /// Trait implemented to convert the type into a VARIANT
 /// Do not implement this yourself without care. 
