@@ -194,6 +194,7 @@ const VT_PDATE:     u32 = VT_BYREF | VT_DATE;
 const VT_PBSTR:     u32 = VT_BYREF | VT_BSTR;
 const VT_PUNKNOWN:  u32 = VT_BYREF | VT_UNKNOWN;
 const VT_PDISPATCH: u32 = VT_BYREF | VT_DISPATCH;
+const VT_PARRAY:    u32 = VT_BYREF | VT_ARRAY;
 const VT_PDECIMAL:  u32 = VT_BYREF | VT_DECIMAL;
 const VT_PI1:       u32 = VT_BYREF | VT_I1;
 const VT_PUI2:      u32 = VT_BYREF | VT_UI2;
@@ -276,6 +277,42 @@ mod private {
     impl_conversions!(SCode, SCODE, VT_ERROR, scode, scode_mut);
     impl_conversions!(Currency, CY, VT_CY, cyVal, cyVal_mut);
     impl_conversions!(Date, DATE, VT_DATE, date, date_mut);
+    impl<S> VariantAccess for Vec<S>
+    where
+        S: SafeArrayElement
+    {
+        const VTYPE: u32 = VT_ARRAY;
+        type Field = *mut SAFEARRAY;
+        fn from_variant(_n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field {
+            unsafe {*n3.parray()}
+        }
+        
+        fn into_variant(inner: Self::Field, _n1: &mut VARIANT_n1, n3: &mut VARIANT_n3){
+            unsafe {
+                let n_ptr = n3.parray_mut();
+                *n_ptr = inner;
+            }
+        }
+    }   
+
+    impl<'s, S> VariantAccess for &'s [S] 
+    where 
+        S: SafeArrayElement
+    {
+        const VTYPE: u32 = VT_ARRAY;
+        type Field = *mut SAFEARRAY;
+        fn from_variant(_n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field {
+            unsafe {*n3.parray()}
+        }
+        
+        fn into_variant(inner: Self::Field, _n1: &mut VARIANT_n1, n3: &mut VARIANT_n3){
+            unsafe {
+                let n_ptr = n3.parray_mut();
+                *n_ptr = inner;
+            }
+        }
+    } 
+    
     impl_conversions!(U16String, BSTR, VT_BSTR, bstrVal, bstrVal_mut);
     impl_conversions!(Ptr<IUnknown>, *mut IUnknown, VT_UNKNOWN, punkVal, punkVal_mut);
     impl_conversions!(Ptr<IDispatch>, *mut IDispatch, VT_DISPATCH,  pdispVal, pdispVal_mut);
@@ -292,7 +329,43 @@ mod private {
     impl_conversions!(Box<U16String>, *mut BSTR, VT_PBSTR, pbstrVal, pbstrVal_mut);
     impl_conversions!(Box<Ptr<IUnknown>>, *mut *mut IUnknown,  VT_PUNKNOWN, ppunkVal, ppunkVal_mut);
     impl_conversions!(Box<Ptr<IDispatch>>, *mut *mut IDispatch, VT_PDISPATCH, ppdispVal, ppdispVal_mut);
-    impl_conversions!(Box<c_void>, *mut c_void, VT_BYREF, byref, byref_mut);
+    impl<S> VariantAccess for Box<Vec<S>>
+    where
+        S: SafeArrayElement
+    {
+        const VTYPE: u32 = VT_PARRAY;
+        type Field = *mut *mut SAFEARRAY;
+        fn from_variant(_n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field {
+            unsafe {*n3.pparray()}
+        }
+        
+        fn into_variant(inner: Self::Field, _n1: &mut VARIANT_n1, n3: &mut VARIANT_n3){
+            unsafe {
+                let n_ptr = n3.pparray_mut();
+                *n_ptr = inner;
+            }
+        }
+    }
+
+    impl<'s, S> VariantAccess for Box<&'s [S]> 
+    where 
+        S: SafeArrayElement
+    {
+        const VTYPE: u32 = VT_PARRAY;
+        type Field = *mut *mut SAFEARRAY;
+        fn from_variant(_n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field {
+            unsafe {*n3.pparray()}
+        }
+        
+        fn into_variant(inner: Self::Field, _n1: &mut VARIANT_n1, n3: &mut VARIANT_n3){
+            unsafe {
+                let n_ptr = n3.pparray_mut();
+                *n_ptr = inner;
+            }
+        }
+    } 
+    //pvarVal - need to redo Variant<T> first.
+    impl_conversions!(Ptr<c_void>, *mut c_void, VT_BYREF, byref, byref_mut);
     impl_conversions!(i8, i8, VT_I1, cVal, cVal_mut);
     impl_conversions!(u16, u16, VT_UI2, uiVal, uiVal_mut);
     impl_conversions!(u32, u32, VT_UI4, ulVal, ulVal_mut);
