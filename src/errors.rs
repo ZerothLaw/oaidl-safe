@@ -1,3 +1,4 @@
+use failure::Error;
 /// Supererror type SafeArray element conversion errors
 #[derive(Debug, Fail)]
 pub enum ElementError {
@@ -8,6 +9,8 @@ pub enum ElementError {
     #[fail(display = "{}", _0)]
     Into(Box<IntoSafeArrElemError>), 
 }
+
+
 
 /// Errors for converting from C/C++ data structure to Rust types
 #[derive(Copy, Clone, Debug, Fail)]
@@ -79,6 +82,25 @@ pub enum SafeArrayError {
     /// Into wrapper for `IntoSafeArrayError`
     #[fail(display = "{}", _0)]
     Into(Box<IntoSafeArrayError>), 
+    /// General purpose holder of `failure::Error` values
+    #[fail(display = "{}", _0)]
+    Convert(Box<Error>),
+}
+
+impl From<Error> for SafeArrayError {
+    fn from(e: Error) -> SafeArrayError {
+        let e = match e.downcast::<FromSafeArrayError>() {
+            Ok(fsae) => return SafeArrayError::From(Box::new(fsae)), 
+            Err(e) => e
+        };
+
+        let e = match e.downcast::<IntoSafeArrayError>() {
+            Ok(isae) => return SafeArrayError::Into(Box::new(isae)),
+            Err(e) => e
+        };
+
+        SafeArrayError::Convert(Box::new(e))
+    }
 }
 
 /// Represents the different ways converting from `SAFEARRAY` can fail
@@ -179,13 +201,17 @@ pub enum BStringError {
     AllocateFailed {
         /// len which was used for allocation
         len: usize
-    },    
+    },
+    /// BSTR pointer passed to function was null    
+    #[fail(display = "BSTR pointer was null, cannot dereference null pointers")]
+    BStrPtrWasNull,
 }
 
 impl From<BStringError> for IntoSafeArrElemError {
     fn from(bse: BStringError) -> IntoSafeArrElemError {
         match bse {
-            BStringError::AllocateFailed{len} =>  IntoSafeArrElemError::BStringAllocFailed{len: len}
+            BStringError::AllocateFailed{len} =>  IntoSafeArrElemError::BStringAllocFailed{len: len},
+            BStringError::BStrPtrWasNull => IntoSafeArrElemError::BStringAllocFailed{len: 0xffff}
         }
     }
 }
@@ -257,4 +283,15 @@ impl<I: Into<SafeArrayError>> From<I> for IntoVariantError {
     fn from(i: I) -> IntoVariantError {
         IntoVariantError::SafeArrConvFailed(Box::new(i.into()))
     }
+}
+
+/// Errors which can arise primarily from using `Conversion::convert` calls
+#[derive(Debug, Fail)]
+pub enum ConversionError {
+    /// Ptr being used was null
+    #[fail(display = "pointer was null")]
+    PtrWasNull, 
+    /// General purpose holder of `failure::Error` values
+    #[fail(display = "{}", _0)]
+    General(Error)
 }

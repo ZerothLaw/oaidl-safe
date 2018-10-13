@@ -1,5 +1,7 @@
 use std::ptr::null_mut;
 
+use failure::Error;
+
 use winapi::um::oleauto::{SysAllocStringLen, SysFreeString, SysStringLen};
 use winapi::shared::wtypes::BSTR;
 pub(crate) use widestring::U16String;
@@ -115,59 +117,64 @@ impl Drop for DroppableBString {
     }
 }
 
-impl Conversion<String> for U16String {
-    fn convert(s: String) -> Self {
-        U16String::from_str(&s)
+impl Conversion<String, Error> for U16String {
+    fn convert(s: String) -> Result<Self, Error> {
+        Ok(U16String::from_str(&s))
     }
 }
 
-impl<'s> Conversion<&'s str> for U16String {
-    fn convert(s: &str) -> Self {
-        U16String::from_str(s)
+impl<'s> Conversion<&'s str, Error> for U16String {
+    fn convert(s: &str) -> Result<Self, Error> {
+        Ok(U16String::from_str(s))
     }
 }
 
-impl Conversion<U16String> for String {
-    fn convert(u: U16String) -> Self {
-        u.to_string_lossy()
+impl Conversion<U16String, Error> for String {
+    fn convert(u: U16String) -> Result<Self, Error> {
+        Ok(u.to_string_lossy())
     }
 }
 
-impl Conversion<U16String> for BSTR {
-    fn convert(u: U16String) -> Self {
-        u.clone().allocate_bstr().unwrap().as_ptr()
+impl Conversion<U16String, Error> for BSTR {
+    fn convert(u: U16String) -> Result<Self, Error> {
+        match u.clone().allocate_bstr() {
+            Ok(ptr) => Ok(ptr.as_ptr()), 
+            Err(ex) => Err(Error::from(ex))
+        }
     }
 }
 
-impl Conversion<BSTR> for U16String {
-    fn convert(p: BSTR) -> Self {
-        U16String::from_bstr(p)
+impl Conversion<BSTR, Error> for U16String {
+    fn convert(p: BSTR) -> Result<Self, Error> {
+        Ok(U16String::from_bstr(p))
     }
 }
 
-impl Conversion<Box<String>> for Box<U16String> {
-    fn convert(b: Box<String>) -> Self {
-        Box::new(U16String::convert(*b))
+impl Conversion<Box<String>, Error> for Box<U16String> {
+    fn convert(b: Box<String>) -> Result<Self, Error> {
+        Ok(Box::new(U16String::convert(*b)?))
     }
 }
 
-impl Conversion<Box<U16String>> for Box<String> {
-    fn convert(b: Box<U16String>) -> Self {
-        Box::new(String::convert(*b))
+impl Conversion<Box<U16String>, Error> for Box<String> {
+    fn convert(b: Box<U16String>) -> Result<Self, Error> {
+        Ok(Box::new(String::convert(*b)?))
     }
 }
 
-impl Conversion<Box<U16String>> for *mut BSTR {
-    fn convert(b: Box<U16String>) -> Self {
+impl Conversion<Box<U16String>, Error> for *mut BSTR {
+    fn convert(b: Box<U16String>) -> Result<Self, Error> {
         let u = *b;
-        let p = Box::new(BSTR::convert(u));
-        Box::into_raw(p)
+        match BSTR::convert(u) {
+            Ok(u) => Ok(Box::into_raw(Box::new(u))), 
+            Err(ex) => Err(Error::from(ex))
+        }
     }
 }
 
-impl Conversion<*mut BSTR> for  Box<U16String>   {
-    fn convert(b: *mut BSTR) -> Self {
-        assert!(!b.is_null());
-        Box::new(U16String::convert(unsafe {*b}))
+impl Conversion<*mut BSTR, Error> for  Box<U16String>   {
+    fn convert(b: *mut BSTR) -> Result<Self, Error> {
+        if b.is_null() {return Err(Error::from(BStringError::BStrPtrWasNull))}
+        Ok(Box::new(U16String::convert(unsafe {*b}).unwrap()))
     }
 }

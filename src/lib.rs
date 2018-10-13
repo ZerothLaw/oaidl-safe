@@ -8,8 +8,8 @@
 //#![deny(single_use_lifetimes)]
 //#![deny(trivial_casts)]
 #![deny(trivial_numeric_casts)]
-#![deny(unreachable_pub)]
-#![deny(unused)]
+//#![deny(unreachable_pub)]
+//#![deny(unused)]
 
 //Turn these warnings into errors
 #![deny(const_err)]

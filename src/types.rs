@@ -13,18 +13,22 @@ use std::convert::{TryFrom};
 #[cfg(feature = "impl_tryfrom")]
 use std::num::{TryFromIntError};
 
+use failure::Error;
+
 use rust_decimal::Decimal;
 
 use winapi::shared::wtypes::{CY, DECIMAL, DECIMAL_NEG, VARIANT_BOOL, VARIANT_TRUE};
 
+use errors::ConversionError;
+
 /// Pseudo-`From` trait because of orphan rules
-pub trait Conversion<T> {
-    fn convert(val: T) -> Self;
+pub trait Conversion<T, E> where Self: Sized{
+    fn convert(val: T) -> Result<Self, E>;
 }
 
-impl<T> Conversion<T> for T where T: From<T>{
-    fn convert(val: T) -> Self {
-        T::from(val)
+impl<T> Conversion<T, Error> for T where T: From<T>{
+    fn convert(val: T) -> Result<Self, Error> {
+        Ok(T::from(val))
     }
 }
 
@@ -66,39 +70,39 @@ macro_rules! wrapper_conv_impl {
             }
         }
 
-        impl Conversion<$inner> for $wrapper {
-            fn convert(val: $inner) -> Self {
-                $wrapper::from(val)
+        impl Conversion<$inner, Error> for $wrapper {
+            fn convert(val: $inner) -> Result<Self, Error> {
+                Ok($wrapper::from(val))
             }
         }
 
-        impl Conversion<$wrapper> for $inner {
-            fn convert(val: $wrapper) -> Self {
-                $inner::from(val)
+        impl Conversion<$wrapper, Error> for $inner {
+            fn convert(val: $wrapper) -> Result<Self, Error> {
+                Ok($inner::from(val))
             }
         }
 
-        impl<'c> Conversion<&'c $inner> for $wrapper {
-            fn convert(val: &$inner) -> Self {
-                $wrapper::from(val)
+        impl<'c> Conversion<&'c $inner, Error> for $wrapper {
+            fn convert(val: &$inner) -> Result<Self, Error> {
+                Ok($wrapper::from(val))
             }
         }
 
-        impl<'c> Conversion<&'c $wrapper> for $inner {
-            fn convert(val: &$wrapper) -> Self {
-                $inner::from(val)
+        impl<'c> Conversion<&'c $wrapper, Error> for $inner {
+            fn convert(val: &$wrapper) -> Result<Self, Error> {
+                Ok($inner::from(val))
             }
         }
 
-        impl<'c> Conversion<&'c mut $inner> for $wrapper {
-            fn convert(val: &mut $inner) -> Self {
-                $wrapper::from(val)
+        impl<'c> Conversion<&'c mut $inner, Error> for $wrapper {
+            fn convert(val: &mut $inner) -> Result<Self, Error> {
+                Ok($wrapper::from(val))
             }
         }
 
-        impl<'c> Conversion<&'c mut $wrapper> for $inner {
-            fn convert(val: &mut $wrapper) -> Self {
-                $inner::from(val)
+        impl<'c> Conversion<&'c mut $wrapper, Error> for $inner {
+            fn convert(val: &mut $wrapper) -> Result<Self, Error> {
+                Ok($inner::from(val))
             }
         }
     };
@@ -106,39 +110,39 @@ macro_rules! wrapper_conv_impl {
 
 macro_rules! conversions_impl {
     ($inner:ident, $wrapper:ident) => {
-        impl Conversion<$inner> for $wrapper {
-            fn convert(val: $inner) -> Self {
-                $wrapper::from(val)
+        impl Conversion<$inner, Error> for $wrapper {
+            fn convert(val: $inner) -> Result<Self, Error> {
+                Ok($wrapper::from(val))
             }
         }
 
-        impl Conversion<$wrapper> for $inner {
-            fn convert(val: $wrapper) -> Self {
-                $inner::from(val)
+        impl Conversion<$wrapper, Error> for $inner {
+            fn convert(val: $wrapper) -> Result<Self, Error> {
+                Ok($inner::from(val))
             }
         }
 
-        impl<'c> Conversion<&'c $inner> for $wrapper {
-            fn convert(val: &$inner) -> Self {
-                $wrapper::from(val)
+        impl<'c> Conversion<&'c $inner, Error> for $wrapper {
+            fn convert(val: &$inner) -> Result<Self, Error> {
+                Ok($wrapper::from(val))
             }
         }
 
-        impl<'c> Conversion<&'c $wrapper> for $inner {
-            fn convert(val: &$wrapper) -> Self {
-                $inner::from(val)
+        impl<'c> Conversion<&'c $wrapper, Error> for $inner {
+            fn convert(val: &$wrapper) -> Result<Self, Error> {
+                Ok($inner::from(val))
             }
         }
 
-        impl<'c> Conversion<&'c mut $inner> for $wrapper {
-            fn convert(val: &mut $inner) -> Self {
-                $wrapper::from(val)
+        impl<'c> Conversion<&'c mut $inner, Error> for $wrapper {
+            fn convert(val: &mut $inner) -> Result<Self, Error> {
+                Ok($wrapper::from(val))
             }
         }
 
-        impl<'c> Conversion<&'c mut $wrapper> for $inner {
-            fn convert(val: &mut $wrapper) -> Self {
-                $inner::from(val)
+        impl<'c> Conversion<&'c mut $wrapper, Error> for $inner {
+            fn convert(val: &mut $wrapper) -> Result<Self, Error> {
+                Ok($inner::from(val))
             }
         }
     };
@@ -146,20 +150,22 @@ macro_rules! conversions_impl {
 
 macro_rules! impl_conv_for_box_wrapper {
     ($wrapper:ident, $inner:ident) => {
-        impl Conversion<Box<$wrapper>> for *mut $inner {
-            fn convert(b: Box<$wrapper>) -> Self {
+        impl Conversion<Box<$wrapper>, Error> for *mut $inner {
+            fn convert(b: Box<$wrapper>) -> Result<Self, Error> {
                 let b = *b;
                 let inner = $inner::from(b);
-                Box::into_raw(Box::new(inner))
+                Ok(Box::into_raw(Box::new(inner)))
             }
         }
 
-        impl Conversion<*mut $inner> for Box<$wrapper> {
-            fn convert(inner: *mut $inner) -> Self {
-                assert!(!inner.is_null());
+        impl Conversion<*mut $inner, Error> for Box<$wrapper> {
+            fn convert(inner: *mut $inner) -> Result<Self, Error> {
+                if inner.is_null() {
+                    return Err(Error::from(ConversionError::PtrWasNull));
+                }
                 let inner = unsafe {*inner};
                 let wrapper = $wrapper::from(inner);
-                Box::new(wrapper)
+                Ok(Box::new(wrapper))
             }
         }
     };
@@ -451,45 +457,45 @@ impl AsRef<bool> for VariantBool {
 conversions_impl!(bool, VariantBool);
 conversions_impl!(VariantBool, VARIANT_BOOL);
 
-impl Conversion<Box<bool>> for *mut VARIANT_BOOL {
-    fn convert(b: Box<bool>) -> Self {
+impl Conversion<Box<bool>, Error> for *mut VARIANT_BOOL {
+    fn convert(b: Box<bool>) -> Result<Self, Error> {
         let b = *b;
         let vb = VARIANT_BOOL::from(b);
-        Box::into_raw(Box::new(vb))
+        Ok(Box::into_raw(Box::new(vb)))
     }
 }
 
-impl Conversion<*mut VARIANT_BOOL> for Box<bool> {
-    fn convert(p: *mut VARIANT_BOOL) -> Self {
-        assert!(!p.is_null());
-        Box::new(bool::from(VariantBool::from(unsafe{*p})))
+impl Conversion<*mut VARIANT_BOOL, Error> for Box<bool> {
+    fn convert(p: *mut VARIANT_BOOL) -> Result<Self, Error> {
+        if p.is_null() {return Err(Error::from(ConversionError::PtrWasNull))}
+        Ok(Box::new(bool::from(VariantBool::from(unsafe{*p}))))
     }
 }
 
-impl Conversion<Box<VariantBool>> for Box<bool> {
-    fn convert(b: Box<VariantBool>) -> Self {
-        Box::new(bool::convert(*b))
+impl Conversion<Box<VariantBool>, Error> for Box<bool> {
+    fn convert(b: Box<VariantBool>) -> Result<Self, Error> {
+        Ok(Box::new(bool::convert(*b)?))
     }
 }
 
-impl Conversion<Box<bool>> for Box<VariantBool> {
-    fn convert(b: Box<bool>) -> Self {
-        Box::new(VariantBool::convert(*b))
+impl Conversion<Box<bool>, Error> for Box<VariantBool> {
+    fn convert(b: Box<bool>) -> Result<Self, Error> {
+        Ok(Box::new(VariantBool::convert(*b)?))
     }
 }
 
-impl Conversion<Box<VariantBool>> for *mut VARIANT_BOOL {
-    fn convert(b: Box<VariantBool>) -> Self {
+impl Conversion<Box<VariantBool>, Error> for *mut VARIANT_BOOL {
+    fn convert(b: Box<VariantBool>) -> Result<Self,Error> {
         let b = *b;
         let vb = VARIANT_BOOL::from(b);
-        Box::into_raw(Box::new(vb))
+        Ok(Box::into_raw(Box::new(vb)))
     }
 }
 
-impl Conversion<*mut VARIANT_BOOL> for Box<VariantBool> {
-    fn convert(p: *mut VARIANT_BOOL) -> Self {
-        assert!(!p.is_null());
-        Box::new(VariantBool::from(unsafe{*p}))
+impl Conversion<*mut VARIANT_BOOL, Error> for Box<VariantBool> {
+    fn convert(p: *mut VARIANT_BOOL) -> Result<Self, Error> {
+        if p.is_null() {return Err(Error::from(ConversionError::PtrWasNull))}
+        Ok(Box::new(VariantBool::from(unsafe{*p})))
     }
 }
 

@@ -137,6 +137,7 @@ use std::ptr::{ null_mut};
 //use rust_decimal::Decimal;
 
 //use widestring::U16String;
+use failure::{Error};
 
 use winapi::ctypes::c_void;
 use winapi::shared::wtypes::{
@@ -167,7 +168,7 @@ use winapi::shared::wtypes::{
     VT_UI8,  
     VT_UINT, 
     VT_UNKNOWN, 
-    //VT_VARIANT, 
+    VT_VARIANT, 
 };
 use winapi::shared::wtypesbase::SCODE;
 use winapi::um::oaidl::{IDispatch,  __tagVARIANT, SAFEARRAY, VARIANT, VARIANT_n3, VARIANT_n1};
@@ -178,7 +179,7 @@ use super::array::{SafeArrayElement};
 
 #[allow(unused_imports)]
 use super::bstr::{BStringExt, U16String};
-use super::errors::{IntoVariantError, FromVariantError};
+use super::errors::{IntoVariantError, FromVariantError, ConversionError};
 use super::ptr::Ptr;
 use super::types::{ Conversion, Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool };
 
@@ -206,6 +207,10 @@ const VT_PUINT:     u32 = VT_BYREF | VT_UINT;
 
 mod private {
     use super::*;
+
+    #[doc(hidden)]
+    pub trait Sealed {}
+
     #[doc(hidden)]
     pub trait VariantAccess: Sized {
         #[doc(hidden)]
@@ -430,16 +435,16 @@ mod private {
 
     macro_rules! box_impls {
         ($t:ident) => {
-            impl Conversion<Box<$t>> for *mut $t {
-                fn convert(b: Box<$t>) -> Self {
-                    Box::into_raw(b)
+            impl Conversion<Box<$t>, Error> for *mut $t {
+                fn convert(b: Box<$t>) -> Result<Self, Error> {
+                    Ok(Box::into_raw(b))
                 }
             }
 
-            impl Conversion<*mut $t> for Box<$t> {
-                fn convert(p: *mut $t) -> Self {
-                    assert!(!p.is_null());
-                    Box::new(unsafe {*p})
+            impl Conversion<*mut $t, Error> for Box<$t> {
+                fn convert(p: *mut $t) -> Result<Self, Error> {
+                    if p.is_null() {return Err(Error::from(ConversionError::PtrWasNull))}
+                    Ok(Box::new(unsafe {*p}))
                 }
             }
         };
@@ -455,6 +460,78 @@ mod private {
     box_impls!(i16);
     box_impls!(i32);
     box_impls!(i64);
+
+    impl<A: VariantExt<B, Field=C> + Clone, B, C> Sealed for Variant<A, B, C> {}
+
+    impl<A: VariantExt<B, Field=C> + Clone, B, C> Conversion<Variant<A, B, C>, Error> for A {
+        fn convert(v: Variant<A, B, C>) -> Result<Self, Error> {
+            Ok(v.unwrap())
+        }
+    }
+
+    impl<A: VariantExt<B, Field=C> + Clone, B, C> Conversion<A, Error> for Variant<A, B, C> {
+        fn convert(a: A) -> Result<Self, Error> {
+            Ok(Variant{
+                inner: a, 
+                _marker: PhantomData
+            })
+        }
+    }
+
+    impl<A: VariantExt<B, Field=C> + Clone, B, C> VariantAccess for Variant<A, B, C> {
+        const VTYPE:u32 = VT_VARIANT;
+        type Field = *mut VARIANT;
+        fn from_var(_n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field {
+            unsafe {*n3.pvarVal()}
+        }
+        
+        fn into_var(inner: Self::Field, _n1: &mut VARIANT_n1, n3: &mut VARIANT_n3) {
+            unsafe {
+                let n_ptr = n3.pvarVal_mut();
+                *n_ptr = inner
+            }
+        }
+    }
+
+    impl<A: VariantExt<B, Field=C> + Clone, B, C> Conversion<*mut VARIANT, Error> for Variant<A, B, C> {
+        fn convert(p: *mut VARIANT) -> Result<Self, Error> {
+            let p = match Ptr::with_checked(p) {
+                Some(p) => p, 
+                None => return Err(Error::from(ConversionError::PtrWasNull))
+            };
+            let a = match <A as VariantExt<B>>::from_variant(p){
+                Ok(s) => s, 
+                Err(ex) => return Err(Error::from(ex))
+            };
+            Ok(Variant::<A, B, C>::convert(a).unwrap())
+        }
+    }
+
+    impl<A: VariantExt<B, Field=C> + Clone, B, C> Conversion<Variant<A, B, C>, Error> for *mut VARIANT {
+        fn convert(v: Variant<A, B, C>) -> Result<Self, Error> {
+            let a = v.unwrap();
+            let p = <A as VariantExt<B>>::into_variant(a)?;
+            Ok(p.as_ptr())
+        }
+    }
+
+}
+
+struct Variant<A, B, C> 
+where
+    A: VariantExt<B, Field=C> + Clone
+{
+    inner: A, 
+    _marker: PhantomData<B>
+}
+
+impl<A, B, C> Variant<A, B, C> 
+where
+    A: VariantExt<B, Field=C> + Clone
+{
+    pub fn unwrap(&self) -> A {
+        self.inner.clone()
+    }
 }
 
 struct VariantDestructor {
@@ -495,11 +572,18 @@ pub trait VariantExt<B>: self::private::VariantAccess { //Would like Clone, but 
     fn into_variant(value: Self) -> Result<Ptr<VARIANT>, IntoVariantError>;
 }
 
+// impl<B> VariantExt<B> for B 
+// where 
+//     B: self::private::VariantAccess<Field=B> 
+// {
+
+// }
+
 impl<A, B, C> VariantExt<B> for A
 where
-    A: self::private::VariantAccess<Field=C> + Conversion<B>,
-    B: Conversion<A> + Conversion<C>, 
-    C: Conversion<B>, 
+    A: self::private::VariantAccess<Field=C> + Conversion<B, Error>,
+    B: Conversion<A, Error> + Conversion<C, Error>, 
+    C: Conversion<B, Error>,
 {
     fn from_variant(pvar: Ptr<VARIANT>) -> Result<Self, FromVariantError> {
         let var = pvar.as_ptr();
@@ -507,13 +591,13 @@ where
         let mut n1 = unsafe {(*var).n1};
         let n3 = unsafe {n1.n2_mut().n3};
         let inner = Self::from_var(&n1, &n3);
-        Ok(Self::convert(B::convert(inner)))
+        Ok(Self::convert(B::convert(inner) ? )? )
     }
 
     fn into_variant(value: A) -> Result<Ptr<VARIANT>, IntoVariantError> {
         let mut n3: VARIANT_n3 = unsafe {mem::zeroed()};
         let mut n1: VARIANT_n1 = unsafe {mem::zeroed()};
-        Self::into_var(C::convert(B::convert(value)), &mut n1, &mut n3);
+        Self::into_var(C::convert(B::convert(value)? )?, &mut n1, &mut n3);
 
         let tv = __tagVARIANT { vt: <Self as private::VariantAccess>::VTYPE as u16, 
                         wReserved1: 0, 
@@ -528,6 +612,7 @@ where
         Ok(Ptr::with_checked(Box::into_raw(var)).unwrap())
     }
 }
+
 // /// Helper struct to wrap a VARIANT compatible type into a VT_VARIANT marked VARIANT
 // #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 // pub struct Variant<T: VariantExt>(T);
@@ -1244,12 +1329,13 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+    type PVariant<T> = Variant<T, T, T>;
     macro_rules! validate_variant {
         ($t:ident, $b:ident, $val:expr, $vt:expr) => {
             let v = $val;
             let var = match VariantExt::<$b>::into_variant(v.clone()) {
                 Ok(var) => var, 
-                Err(_) => panic!("Error")
+                Err(ex) => panic!(ex)
             };
             assert!(!var.as_ptr().is_null());
             unsafe {
@@ -1374,23 +1460,6 @@ mod test {
         type BU16 = Box<U16String>;
         validate_variant!(BStr, BU16, Box::new(String::from("testing abc1267 ?Ťũřǐꝥꞔ")), VT_PBSTR);
     }
-    // #[test]
-    // fn test_variant() {
-    //     let v = Variant::new(1000u64);
-    //     let var = match v.into_variant() {
-    //         Ok(var) => var, 
-    //         Err(_) => panic!("Error")
-    //     };
-    //     assert!(!var.as_ptr().is_null());
-    //     unsafe {
-    //         let pvar = var.as_ptr();
-    //         let n1 = (*pvar).n1;
-    //         let tv: &__tagVARIANT = n1.n2();
-    //         assert_eq!(tv.vt as u32, VT_VARIANT);
-    //     };
-    //     let var = Variant::<u64>::from_variant(var);
-    //     assert_eq!(v, var.unwrap());
-    // }
     //test SafeArray<T>
     //Ptr<c_void>
     #[test]
@@ -1429,14 +1498,25 @@ mod test {
         type Bu64 = Box<u64>;
         validate_variant!(Bu64, Bu64,  Box::new(11976u64), VT_PUI8);
     }
-//     #[test]
-//     fn test_send() {
-//         fn assert_send<T: Send>() {}
-//         assert_send::<Variant<i64>>();
-//     }
-//     #[test]
-//     fn test_sync() {
-//         fn assert_sync<T: Sync>() {}
-//         assert_sync::<Variant<i64>>();
-//     }
+
+    #[test]
+    fn variant() {
+        let b = 156u8;
+        let c: PVariant<u8> = Variant::convert(b).unwrap();
+        let v = VariantExt::<PVariant<u8> >::into_variant(c).unwrap();
+        let v: PVariant<u8>  = VariantExt::<PVariant<u8>>::from_variant(v).unwrap();
+        let d = v.unwrap();
+        assert_eq!(d, b);
+    }
+
+    #[test]
+    fn test_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<PVariant<i64>>();
+    }
+    #[test]
+    fn test_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<PVariant<i64>>();
+    }
 }
