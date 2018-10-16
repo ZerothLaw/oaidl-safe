@@ -13,23 +13,54 @@ use std::convert::{TryFrom};
 #[cfg(feature = "impl_tryfrom")]
 use std::num::{TryFromIntError};
 
-use failure::Error;
+use failure;
 
 use rust_decimal::Decimal;
 
 use winapi::shared::wtypes::{CY, DECIMAL, DECIMAL_NEG, VARIANT_BOOL, VARIANT_TRUE};
 
-use errors::ConversionError;
+use errors::{ConversionError, FromVariantError, IntoVariantError};
 
 /// Pseudo-`From` trait because of orphan rules
-pub trait Conversion<T, E> where Self: Sized{
-    fn convert(val: T) -> Result<Self, E>;
+pub trait TryConvert<T, F> 
+where 
+    Self: Sized, 
+    F: failure::Fail,
+{
+    fn try_convert(val: T) -> Result<Self, F>;
 }
 
-impl<T> Conversion<T, Error> for T where T: From<T>{
-    fn convert(val: T) -> Result<Self, Error> {
-        Ok(T::from(val))
+impl<T, F> TryConvert<T, F> for T
+where
+    T: From<T>, 
+    F: failure::Fail 
+{
+    fn try_convert(val: T) -> Result<Self, F> {
+        Ok(val)
     }
+}
+
+macro_rules! impl_conv_for_box_wrapper {
+    ($inner:ident, $wrapper:ident) => {
+        impl TryConvert<Box<$wrapper>,IntoVariantError> for *mut $inner {
+            fn try_convert(b: Box<$wrapper>) -> Result<Self,IntoVariantError> {
+                let b = *b;
+                let inner = $inner::from(b);
+                Ok(Box::into_raw(Box::new(inner)))
+            }
+        }
+
+        impl TryConvert<*mut $inner,FromVariantError> for Box<$wrapper> {
+            fn try_convert(inner: *mut $inner) -> Result<Self,FromVariantError> {
+                if inner.is_null() {
+                    return Err(FromVariantError::VariantPtrNull);
+                }
+                let inner = unsafe {*inner};
+                let wrapper = $wrapper::from(inner);
+                Ok(Box::new(wrapper))
+            }
+        }
+    };
 }
 
 macro_rules! wrapper_conv_impl {
@@ -70,107 +101,50 @@ macro_rules! wrapper_conv_impl {
             }
         }
 
-        impl Conversion<$inner, Error> for $wrapper {
-            fn convert(val: $inner) -> Result<Self, Error> {
-                Ok($wrapper::from(val))
-            }
-        }
-
-        impl Conversion<$wrapper, Error> for $inner {
-            fn convert(val: $wrapper) -> Result<Self, Error> {
-                Ok($inner::from(val))
-            }
-        }
-
-        impl<'c> Conversion<&'c $inner, Error> for $wrapper {
-            fn convert(val: &$inner) -> Result<Self, Error> {
-                Ok($wrapper::from(val))
-            }
-        }
-
-        impl<'c> Conversion<&'c $wrapper, Error> for $inner {
-            fn convert(val: &$wrapper) -> Result<Self, Error> {
-                Ok($inner::from(val))
-            }
-        }
-
-        impl<'c> Conversion<&'c mut $inner, Error> for $wrapper {
-            fn convert(val: &mut $inner) -> Result<Self, Error> {
-                Ok($wrapper::from(val))
-            }
-        }
-
-        impl<'c> Conversion<&'c mut $wrapper, Error> for $inner {
-            fn convert(val: &mut $wrapper) -> Result<Self, Error> {
-                Ok($inner::from(val))
-            }
-        }
+        conversions_impl!($inner, $wrapper);
+        impl_conv_for_box_wrapper!($inner, $wrapper);
     };
 }
 
 macro_rules! conversions_impl {
     ($inner:ident, $wrapper:ident) => {
-        impl Conversion<$inner, Error> for $wrapper {
-            fn convert(val: $inner) -> Result<Self, Error> {
+        impl TryConvert<$inner,FromVariantError> for $wrapper {
+            fn try_convert(val: $inner) -> Result<Self,FromVariantError> {
                 Ok($wrapper::from(val))
             }
         }
 
-        impl Conversion<$wrapper, Error> for $inner {
-            fn convert(val: $wrapper) -> Result<Self, Error> {
+        impl TryConvert<$wrapper,IntoVariantError> for $inner {
+            fn try_convert(val: $wrapper) -> Result<Self,IntoVariantError> {
                 Ok($inner::from(val))
             }
         }
 
-        impl<'c> Conversion<&'c $inner, Error> for $wrapper {
-            fn convert(val: &$inner) -> Result<Self, Error> {
+        impl<'c> TryConvert<&'c $inner,FromVariantError> for $wrapper {
+            fn try_convert(val: &$inner) -> Result<Self,FromVariantError> {
                 Ok($wrapper::from(val))
             }
         }
 
-        impl<'c> Conversion<&'c $wrapper, Error> for $inner {
-            fn convert(val: &$wrapper) -> Result<Self, Error> {
+        impl<'c> TryConvert<&'c $wrapper,IntoVariantError> for $inner {
+            fn try_convert(val: &$wrapper) -> Result<Self,IntoVariantError> {
                 Ok($inner::from(val))
             }
         }
 
-        impl<'c> Conversion<&'c mut $inner, Error> for $wrapper {
-            fn convert(val: &mut $inner) -> Result<Self, Error> {
+        impl<'c> TryConvert<&'c mut $inner,FromVariantError> for $wrapper {
+            fn try_convert(val: &mut $inner) -> Result<Self,FromVariantError> {
                 Ok($wrapper::from(val))
             }
         }
 
-        impl<'c> Conversion<&'c mut $wrapper, Error> for $inner {
-            fn convert(val: &mut $wrapper) -> Result<Self, Error> {
+        impl<'c> TryConvert<&'c mut $wrapper,IntoVariantError> for $inner {
+            fn try_convert(val: &mut $wrapper) -> Result<Self,IntoVariantError> {
                 Ok($inner::from(val))
             }
         }
     };
 }
-
-macro_rules! impl_conv_for_box_wrapper {
-    ($wrapper:ident, $inner:ident) => {
-        impl Conversion<Box<$wrapper>, Error> for *mut $inner {
-            fn convert(b: Box<$wrapper>) -> Result<Self, Error> {
-                let b = *b;
-                let inner = $inner::from(b);
-                Ok(Box::into_raw(Box::new(inner)))
-            }
-        }
-
-        impl Conversion<*mut $inner, Error> for Box<$wrapper> {
-            fn convert(inner: *mut $inner) -> Result<Self, Error> {
-                if inner.is_null() {
-                    return Err(Error::from(ConversionError::PtrWasNull));
-                }
-                let inner = unsafe {*inner};
-                let wrapper = $wrapper::from(inner);
-                Ok(Box::new(wrapper))
-            }
-        }
-    };
-}
-
 
 /// Helper type for the OLE/COM+ type CY
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -209,14 +183,19 @@ impl<'c> From<&'c mut Currency> for CY {
     }
 }
 
+impl From<i64> for Currency {
+    fn from(i: i64) -> Self {
+        Currency(i)
+    }
+}
+
 impl AsRef<i64> for Currency {
     fn as_ref(&self) -> &i64 {
         &self.0
     }
 }
-wrapper_conv_impl!(i64, Currency);
-conversions_impl!(Currency, CY);
-impl_conv_for_box_wrapper!(Currency, CY);
+conversions_impl!(CY, Currency);
+impl_conv_for_box_wrapper!(CY, Currency);
 
 /// Helper type for the OLE/COM+ type DATE
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -230,7 +209,8 @@ impl AsRef<f64> for Date {
 }
 
 wrapper_conv_impl!(f64, Date);
-impl_conv_for_box_wrapper!(Date, f64);
+
+
 /// Helper type for the OLE/COM+ type DECIMAL
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -257,7 +237,7 @@ impl DecWrapper {
         &mut self.0
     }
 
-    fn build_c_decimal(dec: Decimal) -> DECIMAL {
+    fn build_c_decimal(dec: &Decimal) -> DECIMAL {
         let scale = dec.scale() as u8;
         let sign = if dec.is_sign_positive() {0} else {DECIMAL_NEG};
         let serial = dec.serialize();
@@ -282,7 +262,7 @@ impl DecWrapper {
         }
     }
 
-    fn build_rust_decimal(dec: DECIMAL) -> Decimal {
+    fn build_rust_decimal(dec: &DECIMAL) -> Decimal {
         let sign = if dec.sign == DECIMAL_NEG {true} else {false};
         Decimal::from_parts((dec.Lo64 & 0xFFFFFFFF) as u32, 
                             ((dec.Lo64 >> 32) & 0xFFFFFFFF) as u32, 
@@ -304,34 +284,34 @@ impl DecWrapper {
 //DECIMAL to DecWrapper conversions
 impl From<DECIMAL> for DecWrapper {
     fn from(d: DECIMAL) -> DecWrapper {
-        DecWrapper(DecWrapper::build_rust_decimal(d))
+        DecWrapper(DecWrapper::build_rust_decimal(&d))
     }
 }
 impl<'d> From<&'d DECIMAL> for DecWrapper {
     fn from(d: &DECIMAL) -> DecWrapper {
-        DecWrapper(DecWrapper::build_rust_decimal(d.clone()))
+        DecWrapper(DecWrapper::build_rust_decimal(d))
     }
 }
 impl<'d> From<&'d mut DECIMAL> for DecWrapper {
     fn from(d: &mut DECIMAL) -> DecWrapper {
-        DecWrapper(DecWrapper::build_rust_decimal(d.clone()))
+        DecWrapper(DecWrapper::build_rust_decimal(d))
     }
 }
 
 //DecWrapper to DECIMAL conversions
 impl From<DecWrapper> for DECIMAL {
     fn from(d: DecWrapper) -> DECIMAL {
-        DecWrapper::build_c_decimal(d.0)
+        DecWrapper::build_c_decimal(&d.0)
     }
 }
 impl<'d> From<&'d DecWrapper> for DECIMAL {
     fn from(d: &DecWrapper) -> DECIMAL {
-        DecWrapper::build_c_decimal(d.0)
+        DecWrapper::build_c_decimal(&d.0)
     }
 }
 impl<'d> From<&'d mut DecWrapper> for DECIMAL {
     fn from(d: & mut DecWrapper) -> DECIMAL {
-        DecWrapper::build_c_decimal(d.0)
+        DecWrapper::build_c_decimal(&d.0)
     }
 }
 
@@ -374,8 +354,7 @@ impl AsRef<Decimal> for DecWrapper {
         &self.0
     }
 }
-conversions_impl!(Decimal, DecWrapper);
-conversions_impl!(DecWrapper, DECIMAL);
+conversions_impl!(DECIMAL, DecWrapper);
 
 /// Helper type for the OLE/COM+ type VARIANT_BOOL
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -455,46 +434,12 @@ impl AsRef<bool> for VariantBool {
 }
 
 conversions_impl!(bool, VariantBool);
-conversions_impl!(VariantBool, VARIANT_BOOL);
+conversions_impl!(VARIANT_BOOL, VariantBool);
+impl_conv_for_box_wrapper!(VARIANT_BOOL, VariantBool);
 
-impl Conversion<Box<bool>, Error> for *mut VARIANT_BOOL {
-    fn convert(b: Box<bool>) -> Result<Self, Error> {
-        let b = *b;
-        let vb = VARIANT_BOOL::from(b);
-        Ok(Box::into_raw(Box::new(vb)))
-    }
-}
-
-impl Conversion<*mut VARIANT_BOOL, Error> for Box<bool> {
-    fn convert(p: *mut VARIANT_BOOL) -> Result<Self, Error> {
-        if p.is_null() {return Err(Error::from(ConversionError::PtrWasNull))}
-        Ok(Box::new(bool::from(VariantBool::from(unsafe{*p}))))
-    }
-}
-
-impl Conversion<Box<VariantBool>, Error> for Box<bool> {
-    fn convert(b: Box<VariantBool>) -> Result<Self, Error> {
-        Ok(Box::new(bool::convert(*b)?))
-    }
-}
-
-impl Conversion<Box<bool>, Error> for Box<VariantBool> {
-    fn convert(b: Box<bool>) -> Result<Self, Error> {
-        Ok(Box::new(VariantBool::convert(*b)?))
-    }
-}
-
-impl Conversion<Box<VariantBool>, Error> for *mut VARIANT_BOOL {
-    fn convert(b: Box<VariantBool>) -> Result<Self,Error> {
-        let b = *b;
-        let vb = VARIANT_BOOL::from(b);
-        Ok(Box::into_raw(Box::new(vb)))
-    }
-}
-
-impl Conversion<*mut VARIANT_BOOL, Error> for Box<VariantBool> {
-    fn convert(p: *mut VARIANT_BOOL) -> Result<Self, Error> {
-        if p.is_null() {return Err(Error::from(ConversionError::PtrWasNull))}
+impl TryConvert<*mut VARIANT_BOOL,ConversionError> for Box<VariantBool> {
+    fn try_convert(p: *mut VARIANT_BOOL) -> Result<Self,ConversionError> {
+        if p.is_null() {return Err(ConversionError::PtrWasNull)}
         Ok(Box::new(VariantBool::from(unsafe{*p})))
     }
 }
@@ -536,7 +481,6 @@ impl fmt::Binary for Int {
 }
 
 wrapper_conv_impl!(i32, Int);
-impl_conv_for_box_wrapper!(Int, i32);
 
 #[cfg(feature = "impl_tryfrom")]
 impl TryFrom<i64> for Int {
@@ -605,7 +549,6 @@ impl fmt::Binary for UInt {
 }
 
 wrapper_conv_impl!(u32, UInt);
-impl_conv_for_box_wrapper!(UInt, u32);
 
 #[cfg(feature = "impl_tryfrom")]
 impl TryFrom<u64> for UInt {
@@ -673,9 +616,7 @@ impl fmt::Binary for SCode {
         write!(f, "{:b}", self.0)
     }
 }
-
 wrapper_conv_impl!(i32, SCode);
-impl_conv_for_box_wrapper!(SCode, i32);
 
 #[cfg(test)]
 mod tests {
@@ -687,7 +628,7 @@ mod tests {
         assert_eq!(d.is_sign_positive(), true);
         assert_eq!(format!("{}", d), "1208925819333149903028225" );
         
-        let c = DecWrapper::build_c_decimal(d);
+        let c = DecWrapper::build_c_decimal(&d);
         //println!("({}, {}, {}, {})", c.Hi32, c.Lo64, c.scale, c.sign);
         //println!("{:?}", d.serialize());
         assert_eq!(c.Hi32, 65535);
@@ -705,7 +646,7 @@ mod tests {
             Hi32: 65535, 
             Lo64: 18446462594437873665
         };
-        let new_d = DecWrapper::build_rust_decimal(d);
+        let new_d = DecWrapper::build_rust_decimal(&d);
         //println!("{:?}", new_d.serialize());
        // assert_eq!(new_d.is_sign_positive(), true);
         assert_eq!(format!("{}", new_d), "1208925819333149903028225"  );

@@ -265,6 +265,9 @@ pub enum IntoVariantError {
     /// Encapsulates a `SafeArrayError`
     #[fail(display = "SafeArray conversion failed: {}", _0)]
     SafeArrConvFailed(Box<SafeArrayError>),
+    #[fail(display = "conversion failed: {}", _0)]
+    /// Encapsulates a [`ConversionError`]
+    ConvertFailed(Box<ConversionError>),
 }
 
 impl From<IntoVariantError> for IntoSafeArrElemError {
@@ -293,5 +296,17 @@ pub enum ConversionError {
     PtrWasNull, 
     /// General purpose holder of `failure::Error` values
     #[fail(display = "{}", _0)]
-    General(Error)
+    General(Box<Error>)
+}
+
+impl From<IntoVariantError> for ConversionError {
+    fn from(ive: IntoVariantError) -> Self {
+        ConversionError::General(Box::new(Error::from(ive)))
+    }
+}
+
+impl From<FromVariantError> for ConversionError {
+    fn from(fve: FromVariantError) -> Self {
+        ConversionError::General(Box::new(Error::from(fve)))
+    }
 }

@@ -48,7 +48,7 @@
 //! use widestring::U16String;
 //! use winapi::um::oaidl::VARIANT;
 //! 
-//! use oaidl::{VariantExt};
+//! use oaidl::{BStringExt, ConversionError, VariantExt};
 //! 
 //! //simulate an FFI function
 //! unsafe fn c_masq(s: *mut VARIANT, p: *mut VARIANT) {
@@ -60,18 +60,13 @@
 //!     let p = *p;
 //! }
 //! 
-//! fn main() {
+//! fn main() -> Result<(), ConversionError> {
 //!     let mut u = 1337u32;
-//!     let mut sr = String::from("Turing completeness.");
-//!     let p = match <u32 as VariantExt<u32>>::into_variant(u) {
-//!         Ok(pvar) => pvar, 
-//!         Err(ex) => panic!(ex),
-//!     };
-//!     let s = match <String as VariantExt<U16String>>::into_variant(sr) {
-//!         Ok(pvar) => pvar, 
-//!         Err(ex) => panic!(ex)
-//!     };
+//!     let mut sr = U16String::from_str("Turing completeness.");
+//!     let p = VariantExt::<u32>::into_variant(u)?;
+//!     let s = VariantExt::<*mut u16>::into_variant(sr)?;
 //!     unsafe {c_masq(s.as_ptr(), p.as_ptr())};
+//!     Ok(())
 //! } 
 
 #[macro_use] extern crate failure;
@@ -102,5 +97,4 @@ pub use self::bstr::{BStringExt, DroppableBString};
 pub use self::errors::*;
 pub use self::ptr::Ptr;
 pub use self::types::{Currency, Date, DecWrapper,Int, SCode, UInt, VariantBool};
-pub use self::variant::VariantExt;
-//pub use self::variant::{Variant, VariantExt, VtEmpty, VtNull};
+pub use self::variant::{Variant, VariantExt, VtEmpty, VtNull};
