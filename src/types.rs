@@ -19,7 +19,7 @@ use rust_decimal::Decimal;
 
 use winapi::shared::wtypes::{CY, DECIMAL, DECIMAL_NEG, VARIANT_BOOL, VARIANT_TRUE};
 
-use errors::{ConversionError, FromSafeArrayError, FromSafeArrElemError, FromVariantError, IntoSafeArrayError, IntoSafeArrElemError, IntoVariantError};
+use errors::{ConversionError, ElementError, FromVariantError, IntoVariantError, SafeArrayError};
 
 /// Pseudo-`From` trait because of orphan rules
 pub trait TryConvert<T, F> 
@@ -145,24 +145,24 @@ macro_rules! conversions_impl {
             }
         }
 
-        impl TryConvert<$inner, FromSafeArrayError> for $wrapper {
-            fn try_convert(val: $inner) -> Result<Self,FromSafeArrayError> {
+        impl TryConvert<$inner, SafeArrayError> for $wrapper {
+            fn try_convert(val: $inner) -> Result<Self,SafeArrayError> {
                 Ok($wrapper::from(val))
             }
         } 
-        impl TryConvert<$wrapper, IntoSafeArrayError> for $inner {
-            fn try_convert(val: $wrapper) -> Result<Self, IntoSafeArrayError> {
+        impl TryConvert<$wrapper, SafeArrayError> for $inner {
+            fn try_convert(val: $wrapper) -> Result<Self, SafeArrayError> {
                 Ok($inner::from(val))
             }
         }
 
-        impl TryConvert<$inner, FromSafeArrElemError> for $wrapper {
-            fn try_convert(val: $inner) -> Result<Self,FromSafeArrElemError> {
+        impl TryConvert<$inner, ElementError> for $wrapper {
+            fn try_convert(val: $inner) -> Result<Self,ElementError> {
                 Ok($wrapper::from(val))
             }
         } 
-        impl TryConvert<$wrapper, IntoSafeArrElemError> for $inner {
-            fn try_convert(val: $wrapper) -> Result<Self, IntoSafeArrElemError> {
+        impl TryConvert<$wrapper, ElementError> for $inner {
+            fn try_convert(val: $wrapper) -> Result<Self, ElementError> {
                 Ok($inner::from(val))
             }
         }

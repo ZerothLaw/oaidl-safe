@@ -4,7 +4,7 @@ use winapi::um::oleauto::{SysAllocStringLen, SysFreeString, SysStringLen};
 use winapi::shared::wtypes::BSTR;
 pub(crate) use widestring::U16String;
 
-use super::errors::{BStringError, FromSafeArrayError, FromVariantError, IntoSafeArrayError, IntoSafeArrElemError, IntoVariantError};
+use super::errors::{BStringError, ElementError, FromVariantError, IntoSafeArrayError, IntoSafeArrElemError, IntoVariantError, SafeArrayError};
 use super::ptr::Ptr;
 use super::types::TryConvert;
 
@@ -151,24 +151,6 @@ impl Drop for DroppableBString {
     }
 }
 
-impl TryConvert<String, BStringError> for U16String {
-    fn try_convert(s: String) -> Result<Self, BStringError> {
-        Ok(U16String::from_str(&s))
-    }
-}
-
-impl<'s> TryConvert<&'s str, BStringError> for U16String {
-    fn try_convert(s: &str) -> Result<Self, BStringError> {
-        Ok(U16String::from_str(s))
-    }
-}
-
-impl TryConvert<U16String, BStringError> for String {
-    fn try_convert(u: U16String) -> Result<Self, BStringError> {
-        Ok(u.to_string_lossy())
-    }
-}
-
 impl TryConvert<U16String, IntoVariantError> for BSTR {
     fn try_convert(u: U16String) -> Result<Self, IntoVariantError> {
         Ok(u.clone().allocate_bstr()?.as_ptr())
@@ -181,26 +163,26 @@ impl TryConvert<BSTR, FromVariantError> for U16String {
     }
 }
 
-impl TryConvert<U16String, IntoSafeArrayError> for BSTR {
-    fn try_convert(u: U16String) -> Result<Self, IntoSafeArrayError> {
+impl TryConvert<U16String, SafeArrayError> for BSTR {
+    fn try_convert(u: U16String) -> Result<Self, SafeArrayError> {
         match u.clone().allocate_bstr() {
             Ok(ptr) => Ok(ptr.as_ptr()), 
-            Err(bse) => Err(IntoSafeArrayError::from_element_err(IntoSafeArrElemError::from(bse), 0))
+            Err(bse) => Err(SafeArrayError::from(IntoSafeArrayError::from_element_err(IntoSafeArrElemError::from(bse), 0)))
         }
     }
 }
 
-impl TryConvert<BSTR, FromSafeArrayError> for U16String {
-    fn try_convert(p: BSTR) -> Result<Self, FromSafeArrayError> {
-        Ok(U16String::from_bstr(p))
-    }
-}
-
-impl TryConvert<U16String, IntoSafeArrElemError> for BSTR {
-    fn try_convert(u: U16String) -> Result<Self,IntoSafeArrElemError> {
+impl TryConvert<U16String, ElementError> for BSTR {
+    fn try_convert(u: U16String) -> Result<Self,ElementError> {
          match u.clone().allocate_bstr() {
             Ok(ptr) => Ok(ptr.as_ptr()), 
-            Err(bse) => Err(IntoSafeArrElemError::from(bse))
+            Err(bse) => Err(ElementError::from(IntoSafeArrElemError::from(bse)))
         }
     } 
+}
+
+impl TryConvert<BSTR, ElementError> for U16String {
+    fn try_convert(b: BSTR) -> Result<Self, ElementError> {
+        Ok(U16String::from_bstr(b))
+    }
 }

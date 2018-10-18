@@ -52,7 +52,7 @@ use winapi::um::unknwnbase::IUnknown;
 use super::array::{SafeArrayElement};
 
 use super::bstr::{U16String};
-use super::errors::{FromSafeArrayError, FromVariantError, IntoSafeArrayError, IntoSafeArrElemError, IntoVariantError};
+use super::errors::{ElementError,  FromVariantError, IntoVariantError};
 use super::ptr::Ptr;
 use super::types::{ TryConvert, Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool };
 
@@ -384,33 +384,25 @@ where
     }
 }
 
-impl<D, T> TryConvert<Variant<D, T>, IntoSafeArrElemError> for *mut VARIANT
+impl<D, T> TryConvert<Variant<D, T>, ElementError> for *mut VARIANT
 where
     D: VariantExt<T>
 {
-    fn try_convert(v: Variant<D, T>) -> Result<Self, IntoSafeArrElemError> {
+    fn try_convert(v: Variant<D, T>) -> Result<Self, ElementError> {
+        println!("TryConvert<Variant<D, T>, ElementError> for *mut VARIANT");
         let v = v.unwrap();
         Ok(VariantExt::<T>::into_variant(v)?.as_ptr())
     }
 }
 
-impl<D, T> TryConvert<*mut VARIANT, FromSafeArrayError> for Variant<D, T> 
+impl<D, T> TryConvert<*mut VARIANT, ElementError> for Variant<D, T> 
 where
     D: VariantExt<T>
 {
-    fn try_convert(ptr: *mut VARIANT) -> Result<Self, FromSafeArrayError> {
+    fn try_convert(ptr: *mut VARIANT) -> Result<Self, ElementError> {
+        println!("TryConvert<*mut VARIANT, ElementError> for Variant<D, T>");
         let ptr = Ptr::with_checked(ptr).unwrap();
         Ok(Variant::wrap(VariantExt::<T>::from_variant(ptr)?))
-    }
-}
-
-impl<D, T> TryConvert<Variant<D, T>, IntoSafeArrayError> for *mut VARIANT
-where
-    D: VariantExt<T>
-{
-    fn try_convert(v: Variant<D, T>) -> Result<Self, IntoSafeArrayError> {
-        let v = v.unwrap();
-        Ok(VariantExt::<T>::into_variant(v)?.as_ptr())
     }
 }
 
@@ -462,6 +454,7 @@ where
 {
     const VARTYPE: u32 = I::VTYPE;
     fn from_variant(pvar: Ptr<VARIANT>) -> Result<Self, FromVariantError> {
+        println!("from_variant: VT: {} -", Self::VARTYPE);
         let var = pvar.as_ptr();
         let _var_d = VariantDestructor::new(var);
         let mut n1 = unsafe {(*var).n1};
