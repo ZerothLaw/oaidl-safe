@@ -10,10 +10,8 @@ pub enum ElementError {
     Into(Box<IntoSafeArrElemError>), 
 }
 
-
-
 /// Errors for converting from C/C++ data structure to Rust types
-#[derive(Copy, Clone, Debug, Fail)]
+#[derive(Debug, Fail)]
 pub enum FromSafeArrElemError {
     /// The unsafe call to SafeArrayGetElement failed - HRESULT stored within tells why
     #[fail(display = "SafeArrayGetElement failed with HRESULT=0x{:x}", hr)]
@@ -33,6 +31,15 @@ pub enum FromSafeArrElemError {
     /// IDispatch pointer during conversion was null
     #[fail(display = "IDispatch pointer is null")]
     DispatchPtrNull,
+    /// `SysAllocStringLen` failed with len
+    #[fail(display = "BSTR allocation failed for len: {}", len)]
+    BStringAllocFailed{
+        /// The len used that failed.
+        len: usize
+    },
+    ///
+    #[fail(display = "from variant failure: {}", _0)]
+    FromVarError(Box<FromVariantError>),
 }
 
 /// Errors for converting into C/C++ data structures from Rust types
@@ -87,22 +94,6 @@ pub enum SafeArrayError {
     Convert(Box<Error>),
 }
 
-impl From<Error> for SafeArrayError {
-    fn from(e: Error) -> SafeArrayError {
-        let e = match e.downcast::<FromSafeArrayError>() {
-            Ok(fsae) => return SafeArrayError::From(Box::new(fsae)), 
-            Err(e) => e
-        };
-
-        let e = match e.downcast::<IntoSafeArrayError>() {
-            Ok(isae) => return SafeArrayError::Into(Box::new(isae)),
-            Err(e) => e
-        };
-
-        SafeArrayError::Convert(Box::new(e))
-    }
-}
-
 /// Represents the different ways converting from `SAFEARRAY` can fail
 #[derive(Debug, Fail)]
 pub enum FromSafeArrayError{
@@ -146,7 +137,10 @@ pub enum FromSafeArrayError{
         index: usize, 
         /// The element error encapsulating the failure
         element: Box<ElementError>
-    }
+    },
+    /// 
+    #[fail(display = "from variant failure: {}", _0)]
+    FromVariantError(Box<FromVariantError>)
 }
 
 /// Represents the different ways converting into `SAFEARRAY` can fail
@@ -163,6 +157,9 @@ pub enum IntoSafeArrayError {
     /// The called to `SafeArrayCreate` failed
     #[fail(display = "safe array creation failed")]
     SafeArrayCreateFailed,
+    /// 
+    #[fail(display = "into variant failure: {}", _0)]
+    IntoVariantError(Box<IntoVariantError>)
 }
 
 impl From<FromSafeArrayError> for SafeArrayError {
@@ -222,6 +219,15 @@ impl From<BStringError> for IntoVariantError {
     }
 }
 
+impl From<BStringError> for FromSafeArrElemError {
+    fn from(bse: BStringError) -> Self {
+        match bse {
+            BStringError::AllocateFailed{len} =>  FromSafeArrElemError::BStringAllocFailed{len: len},
+            BStringError::BStrPtrWasNull => FromSafeArrElemError::BStringAllocFailed{len: 0xffff}
+        }
+    }
+}
+
 /// Encapsulates the ways converting from a `VARIANT` can fail.
 #[derive(Debug, Fail)]
 pub enum FromVariantError {
@@ -276,12 +282,6 @@ impl From<IntoVariantError> for IntoSafeArrElemError {
     }
 }
 
-impl<I: Into<SafeArrayError>> From<I> for FromVariantError {
-    fn from(i: I) -> FromVariantError {
-        FromVariantError::SafeArrConvFailed(Box::new(i.into()))
-    }
-}
-
 impl<I: Into<SafeArrayError>> From<I> for IntoVariantError {
     fn from(i: I) -> IntoVariantError {
         IntoVariantError::SafeArrConvFailed(Box::new(i.into()))
@@ -308,5 +308,22 @@ impl From<IntoVariantError> for ConversionError {
 impl From<FromVariantError> for ConversionError {
     fn from(fve: FromVariantError) -> Self {
         ConversionError::General(Box::new(Error::from(fve)))
+    }
+}
+
+impl From<FromVariantError> for FromSafeArrElemError {
+    fn from(fve: FromVariantError) -> FromSafeArrElemError {
+        FromSafeArrElemError::FromVarError(Box::new(fve))
+    }
+}
+
+impl From<FromVariantError> for FromSafeArrayError {
+    fn from(fve: FromVariantError) -> Self {
+        FromSafeArrayError::FromVariantError(Box::new(fve))
+    }
+}
+impl From<IntoVariantError> for IntoSafeArrayError{
+    fn from(ive: IntoVariantError) -> Self {
+        IntoSafeArrayError::IntoVariantError(Box::new(ive))
     }
 }

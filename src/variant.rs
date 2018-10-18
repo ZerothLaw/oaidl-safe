@@ -9,132 +9,9 @@
 //! [`VtEmpty`]: struct.VtEmpty.html
 //! [`VtNull`]: struct.VtNull.html
 
-/*
-/// 
-/// Reference:
-/// typedef struct tagVARIANT {
-///     union {
-///         struct {
-///             VARTYPE vt;
-///             WORD    wReserved1;
-///             WORD    wReserved2;
-///             WORD    wReserved3;
-///             union {
-///                 LONGLONG     llVal;
-///                 LONG         lVal;
-///                 BYTE         bVal;
-///                 SHORT        iVal;
-///                 FLOAT        fltVal;
-///                 DOUBLE       dblVal;
-///                 VARIANT_BOOL boolVal;
-///                 SCODE        scode;
-///                 CY           cyVal;
-///                 DATE         date;
-///                 BSTR         bstrVal;
-///                 IUnknown     *punkVal;
-///                 IDispatch    *pdispVal;
-///                 SAFEARRAY    *parray;
-///                 BYTE         *pbVal;
-///                 SHORT        *piVal;
-///                 LONG         *plVal;
-///                 LONGLONG     *pllVal;
-///                 FLOAT        *pfltVal;
-///                 DOUBLE       *pdblVal;
-///                 VARIANT_BOOL *pboolVal;
-///                 SCODE        *pscode;
-///                 CY           *pcyVal;
-///                 DATE         *pdate;
-///                 BSTR         *pbstrVal;
-///                 IUnknown     **ppunkVal;
-///                 IDispatch    **ppdispVal;
-///                 SAFEARRAY    **pparray;
-///                 VARIANT      *pvarVal;
-///                 PVOID        byref;
-///                 CHAR         cVal;
-///                 USHORT       uiVal;
-///                 ULONG        ulVal;
-///                 ULONGLONG    ullVal;
-///                 INT          intVal;
-///                 UINT         uintVal;
-///                 DECIMAL      *pdecVal;
-///                 CHAR         *pcVal;
-///                 USHORT       *puiVal;
-///                 ULONG        *pulVal;
-///                 ULONGLONG    *pullVal;
-///                 INT          *pintVal;
-///                 UINT         *puintVal;
-///                 struct {
-///                     PVOID       pvRecord;
-///                     IRecordInfo *pRecInfo;
-///                 } __VARIANT_NAME_4;
-///             } __VARIANT_NAME_3;
-///         } __VARIANT_NAME_2;
-///         DECIMAL decVal;
-///     } __VARIANT_NAME_1;
-/// } VARIANT;*/
-/*
-* VARENUM usage key,
-*
-* * [V] - may appear in a VARIANT
-* * [T] - may appear in a TYPEDESC
-* * [P] - may appear in an OLE property set
-* * [S] - may appear in a Safe Array
-*
-*
-*  VT_EMPTY            [V]   [P]     nothing
-*  VT_NULL             [V]   [P]     SQL style Null
-*  VT_I2               [V][T][P][S]  2 byte signed int
-*  VT_I4               [V][T][P][S]  4 byte signed int
-*  VT_R4               [V][T][P][S]  4 byte real
-*  VT_R8               [V][T][P][S]  8 byte real
-*  VT_CY               [V][T][P][S]  currency
-*  VT_DATE             [V][T][P][S]  date
-*  VT_BSTR             [V][T][P][S]  OLE Automation string
-*  VT_DISPATCH         [V][T]   [S]  IDispatch *
-*  VT_ERROR            [V][T][P][S]  SCODE
-*  VT_BOOL             [V][T][P][S]  True=-1, False=0
-*  VT_VARIANT          [V][T][P][S]  VARIANT *
-*  VT_UNKNOWN          [V][T]   [S]  IUnknown *
-*  VT_DECIMAL          [V][T]   [S]  16 byte fixed point
-*  VT_RECORD           [V]   [P][S]  user defined type
-*  VT_I1               [V][T][P][s]  signed char
-*  VT_UI1              [V][T][P][S]  unsigned char
-*  VT_UI2              [V][T][P][S]  unsigned short
-*  VT_UI4              [V][T][P][S]  ULONG
-*  VT_I8                  [T][P]     signed 64-bit int
-*  VT_UI8                 [T][P]     unsigned 64-bit int
-*  VT_INT              [V][T][P][S]  signed machine int
-*  VT_UINT             [V][T]   [S]  unsigned machine int
-*  VT_INT_PTR             [T]        signed machine register size width
-*  VT_UINT_PTR            [T]        unsigned machine register size width
-*  VT_VOID                [T]        C style void
-*  VT_HRESULT             [T]        Standard return type
-*  VT_PTR                 [T]        pointer type
-*  VT_SAFEARRAY           [T]        (use VT_ARRAY in VARIANT)
-*  VT_CARRAY              [T]        C style array
-*  VT_USERDEFINED         [T]        user defined type
-*  VT_LPSTR               [T][P]     null terminated string
-*  VT_LPWSTR              [T][P]     wide null terminated string
-*  VT_FILETIME               [P]     FILETIME
-*  VT_BLOB                   [P]     Length prefixed bytes
-*  VT_STREAM                 [P]     Name of the stream follows
-*  VT_STORAGE                [P]     Name of the storage follows
-*  VT_STREAMED_OBJECT        [P]     Stream contains an object
-*  VT_STORED_OBJECT          [P]     Storage contains an object
-*  VT_VERSIONED_STREAM       [P]     Stream with a GUID version
-*  VT_BLOB_OBJECT            [P]     Blob contains an object 
-*  VT_CF                     [P]     Clipboard format
-*  VT_CLSID                  [P]     A Class ID
-*  VT_VECTOR                 [P]     simple counted array
-*  VT_ARRAY            [V]           SAFEARRAY*
-*  VT_BYREF            [V]           void* for local use
-*  VT_BSTR_BLOB                      Reserved for system use
-*/
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr::{ null_mut};
-
-// use widestring::U16String;
 
 use winapi::ctypes::c_void;
 use winapi::shared::wtypes::{
@@ -174,9 +51,8 @@ use winapi::um::unknwnbase::IUnknown;
 
 use super::array::{SafeArrayElement};
 
-#[allow(unused_imports)]
-use super::bstr::{BStringExt, U16String};
-use super::errors::{IntoVariantError, FromVariantError};
+use super::bstr::{U16String};
+use super::errors::{FromSafeArrayError, FromVariantError, IntoSafeArrayError, IntoSafeArrElemError, IntoVariantError};
 use super::ptr::Ptr;
 use super::types::{ TryConvert, Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool };
 
@@ -212,6 +88,8 @@ mod private {
     pub trait VariantAccess: Sized {
         #[doc(hidden)]
         const VTYPE: u32;
+
+        #[doc(hidden)]
         type Field;
 
         #[doc(hidden)]
@@ -455,7 +333,7 @@ mod private {
 /// fn main() -> Result<(), ConversionError> {
 ///     let val = 1337u16;
 ///     let val = Variant::wrap(val);
-///     // convert into a PtrVariant as per usual. 
+///     // convert into a Ptr<VARIANT> as per usual. 
 ///     Ok(())
 /// }
 /// ```
@@ -506,6 +384,37 @@ where
     }
 }
 
+impl<D, T> TryConvert<Variant<D, T>, IntoSafeArrElemError> for *mut VARIANT
+where
+    D: VariantExt<T>
+{
+    fn try_convert(v: Variant<D, T>) -> Result<Self, IntoSafeArrElemError> {
+        let v = v.unwrap();
+        Ok(VariantExt::<T>::into_variant(v)?.as_ptr())
+    }
+}
+
+impl<D, T> TryConvert<*mut VARIANT, FromSafeArrayError> for Variant<D, T> 
+where
+    D: VariantExt<T>
+{
+    fn try_convert(ptr: *mut VARIANT) -> Result<Self, FromSafeArrayError> {
+        let ptr = Ptr::with_checked(ptr).unwrap();
+        Ok(Variant::wrap(VariantExt::<T>::from_variant(ptr)?))
+    }
+}
+
+impl<D, T> TryConvert<Variant<D, T>, IntoSafeArrayError> for *mut VARIANT
+where
+    D: VariantExt<T>
+{
+    fn try_convert(v: Variant<D, T>) -> Result<Self, IntoSafeArrayError> {
+        let v = v.unwrap();
+        Ok(VariantExt::<T>::into_variant(v)?.as_ptr())
+    }
+}
+
+// Ensures the allocated memory is cleared correctly
 struct VariantDestructor {
     inner: *mut VARIANT, 
     _marker: PhantomData<VARIANT>
@@ -526,24 +435,26 @@ impl Drop for VariantDestructor {
             return;
         }
         unsafe { VariantClear(self.inner)};
-        unsafe { let _dtor = *self.inner;}
+        unsafe { mem::drop(*self.inner);}
         self.inner = null_mut();
     }
 }
 
-/// Trait implemented to convert the type into a VARIANT
+/// Trait implemented to convert the type into a VARIANT.
 /// Do not implement this yourself without care. 
 pub trait VariantExt<B>: Sized { //Would like Clone, but *mut IDispatch and *mut IUnknown don't implement them
     /// VARTYPE constant value for the type
     const VARTYPE: u32;// = Self::VTYPE;
 
-    /// Call this associated function on a Ptr<VARIANT> to obtain a value T
+    /// Call this associated function on a `Ptr<VARIANT>` to obtain a value `T`
     fn from_variant(var: Ptr<VARIANT>) -> Result<Self, FromVariantError>;  
 
-    /// Convert a value of type T into a Ptr<VARIANT>
+    /// Convert a value of type `T` into a `Ptr<VARIANT>`
     fn into_variant(value: Self) -> Result<Ptr<VARIANT>, IntoVariantError>;
 }
 
+/// Blanket implementation where TryConvert implementations exist between I<==>F 
+/// and a private trait is implemented on I.  
 impl<I, F> VariantExt<F> for I
 where
     I: TryConvert<F, FromVariantError> + self::private::VariantAccess<Field=F>,

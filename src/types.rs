@@ -19,7 +19,7 @@ use rust_decimal::Decimal;
 
 use winapi::shared::wtypes::{CY, DECIMAL, DECIMAL_NEG, VARIANT_BOOL, VARIANT_TRUE};
 
-use errors::{ConversionError, FromVariantError, IntoVariantError};
+use errors::{ConversionError, FromSafeArrayError, FromSafeArrElemError, FromVariantError, IntoSafeArrayError, IntoSafeArrElemError, IntoVariantError};
 
 /// Pseudo-`From` trait because of orphan rules
 pub trait TryConvert<T, F> 
@@ -27,10 +27,11 @@ where
     Self: Sized, 
     F: failure::Fail,
 {
+    /// Utility method which can fail.
     fn try_convert(val: T) -> Result<Self, F>;
 }
 
-impl<T, F> TryConvert<T, F> for T
+impl<T, F> TryConvert<T, F> for T 
 where
     T: From<T>, 
     F: failure::Fail 
@@ -143,6 +144,28 @@ macro_rules! conversions_impl {
                 Ok($inner::from(val))
             }
         }
+
+        impl TryConvert<$inner, FromSafeArrayError> for $wrapper {
+            fn try_convert(val: $inner) -> Result<Self,FromSafeArrayError> {
+                Ok($wrapper::from(val))
+            }
+        } 
+        impl TryConvert<$wrapper, IntoSafeArrayError> for $inner {
+            fn try_convert(val: $wrapper) -> Result<Self, IntoSafeArrayError> {
+                Ok($inner::from(val))
+            }
+        }
+
+        impl TryConvert<$inner, FromSafeArrElemError> for $wrapper {
+            fn try_convert(val: $inner) -> Result<Self,FromSafeArrElemError> {
+                Ok($wrapper::from(val))
+            }
+        } 
+        impl TryConvert<$wrapper, IntoSafeArrElemError> for $inner {
+            fn try_convert(val: $wrapper) -> Result<Self, IntoSafeArrElemError> {
+                Ok($inner::from(val))
+            }
+        }
     };
 }
 
@@ -209,7 +232,6 @@ impl AsRef<f64> for Date {
 }
 
 wrapper_conv_impl!(f64, Date);
-
 
 /// Helper type for the OLE/COM+ type DECIMAL
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -443,7 +465,6 @@ impl TryConvert<*mut VARIANT_BOOL,ConversionError> for Box<VariantBool> {
         Ok(Box::new(VariantBool::from(unsafe{*p})))
     }
 }
-
 
 /// Helper type for the OLE/COM+ type INT
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

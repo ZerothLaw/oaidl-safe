@@ -96,5 +96,5 @@ pub use self::array::{SafeArrayElement, SafeArrayExt};
 pub use self::bstr::{BStringExt, DroppableBString};
 pub use self::errors::*;
 pub use self::ptr::Ptr;
-pub use self::types::{Currency, Date, DecWrapper,Int, SCode, UInt, VariantBool};
+pub use self::types::{Currency, Date, DecWrapper, Int, SCode, TryConvert, UInt, VariantBool};
 pub use self::variant::{Variant, VariantExt, VtEmpty, VtNull};
