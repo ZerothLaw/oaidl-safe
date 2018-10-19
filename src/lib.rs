@@ -48,7 +48,7 @@
 //! use widestring::U16String;
 //! use winapi::um::oaidl::VARIANT;
 //! 
-//! use oaidl::{BStringExt, ConversionError, VariantExt};
+//! use oaidl::{BStringExt, IntoVariantError, VariantExt};
 //! 
 //! //simulate an FFI function
 //! unsafe fn c_masq(s: *mut VARIANT, p: *mut VARIANT) {
@@ -60,7 +60,7 @@
 //!     let p = *p;
 //! }
 //! 
-//! fn main() -> Result<(), ConversionError> {
+//! fn main() -> Result<(), IntoVariantError> {
 //!     let mut u = 1337u32;
 //!     let mut sr = U16String::from_str("Turing completeness.");
 //!     let p = VariantExt::<u32>::into_variant(u)?;

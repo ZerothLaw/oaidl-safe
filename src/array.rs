@@ -201,7 +201,7 @@ where
     D: VariantExt<T>
 {
     const SFTYPE: u32 = VT_VARIANT;
-    type Element = *mut VARIANT;
+    type Element = Ptr<VARIANT>;
 
     #[doc(hidden)]
     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self::Element, ElementError> {
@@ -211,7 +211,7 @@ where
         match hr {
             0 => {
                 empty.inner = null_mut();
-                Ok(&mut def_val)
+                Ok(Ptr::with_checked(Box::into_raw(Box::new(def_val))).unwrap())
             }, 
             _ => {
                 Err(ElementError::from(FromSafeArrElemError::GetElementFailed{hr: hr}))
@@ -221,8 +221,8 @@ where
 
     #[doc(hidden)]
     fn into_safearray(self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), ElementError> {
-        let slf = <*mut VARIANT as TryConvert<Variant<D, T>, ElementError>>::try_convert(self)?;
-        let hr = unsafe { SafeArrayPutElement(psa, &ix, slf as *mut _ as *mut c_void)};
+        let slf = <Ptr<VARIANT> as TryConvert<Variant<D, T>, ElementError>>::try_convert(self)?;
+        let hr = unsafe { SafeArrayPutElement(psa, &ix, slf.as_ptr() as *mut _ as *mut c_void)};
         match hr {
             0 => Ok(()), 
             _ => Err(ElementError::from(IntoSafeArrElemError::PutElementFailed{hr: hr}))
@@ -510,14 +510,14 @@ mod test {
 
     #[test]
     fn test_variant() {
-        let v: Vec<Variant<u64, u64>> = vec![Variant::wrap(100u64), Variant::wrap(100u64), Variant::wrap(103u64)];
+        let v: Vec<Variant<u64, u64>> = vec![Variant::wrap(100u64)];
 
         let mut p = v.into_iter();
         let p = <IntoIter<Variant<u64, u64>> as SafeArrayExt<Variant<u64, u64>>>::into_safearray(&mut p).unwrap();
         
         let r: Result< Vec<Variant<u64, u64>>, SafeArrayError> = IntoIter::from_safearray(p);
         let r = r.unwrap();
-        assert_eq!(r,  vec![Variant::wrap(100u64), Variant::wrap(100u64), Variant::wrap(103u64)]);
+        assert_eq!(r,  vec![Variant::wrap(100u64)]);
     }
 
     #[test]

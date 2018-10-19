@@ -384,24 +384,21 @@ where
     }
 }
 
-impl<D, T> TryConvert<Variant<D, T>, ElementError> for *mut VARIANT
+impl<D, T> TryConvert<Variant<D, T>, ElementError> for Ptr<VARIANT> 
 where
     D: VariantExt<T>
 {
     fn try_convert(v: Variant<D, T>) -> Result<Self, ElementError> {
-        println!("TryConvert<Variant<D, T>, ElementError> for *mut VARIANT");
         let v = v.unwrap();
-        Ok(VariantExt::<T>::into_variant(v)?.as_ptr())
+        Ok(VariantExt::<T>::into_variant(v)?)
     }
 }
 
-impl<D, T> TryConvert<*mut VARIANT, ElementError> for Variant<D, T> 
+impl<D, T> TryConvert<Ptr<VARIANT> , ElementError> for Variant<D, T> 
 where
     D: VariantExt<T>
 {
-    fn try_convert(ptr: *mut VARIANT) -> Result<Self, ElementError> {
-        println!("TryConvert<*mut VARIANT, ElementError> for Variant<D, T>");
-        let ptr = Ptr::with_checked(ptr).unwrap();
+    fn try_convert(ptr: Ptr<VARIANT> ) -> Result<Self, ElementError> {
         Ok(Variant::wrap(VariantExt::<T>::from_variant(ptr)?))
     }
 }
@@ -454,13 +451,12 @@ where
 {
     const VARTYPE: u32 = I::VTYPE;
     fn from_variant(pvar: Ptr<VARIANT>) -> Result<Self, FromVariantError> {
-        println!("from_variant: VT: {} -", Self::VARTYPE);
         let var = pvar.as_ptr();
         let _var_d = VariantDestructor::new(var);
         let mut n1 = unsafe {(*var).n1};
         let n3 = unsafe {n1.n2_mut().n3};
         let inner = I::from_var(&n1, &n3);
-        Ok(I::try_convert(inner)?)
+        Ok(<I as TryConvert<F, FromVariantError>>::try_convert(inner)?)
     }
 
     fn into_variant(value: I) -> Result<Ptr<VARIANT>, IntoVariantError> {
