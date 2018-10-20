@@ -11,11 +11,14 @@
 
 use std::marker::PhantomData;
 use std::mem;
-use std::ptr::{ null_mut};
+use std::ptr::null_mut;
 
 use winapi::ctypes::c_void;
 use winapi::shared::wtypes::{
-    BSTR, CY, DATE, DECIMAL,
+    BSTR, 
+    CY, 
+    DATE, 
+    DECIMAL,
     VARIANT_BOOL,
     VT_ARRAY, 
     VT_BSTR, 
@@ -49,12 +52,11 @@ use winapi::um::oaidl::{IDispatch, SAFEARRAY, __tagVARIANT, VARIANT, VARIANT_n3,
 use winapi::um::oleauto::VariantClear;
 use winapi::um::unknwnbase::IUnknown;
 
-use super::array::{SafeArrayElement};
-
-use super::bstr::{U16String};
+use super::array::SafeArrayElement;
+use super::bstr::U16String;
 use super::errors::{ElementError,  FromVariantError, IntoVariantError};
 use super::ptr::Ptr;
-use super::types::{ TryConvert, Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool };
+use super::types::{ Currency, Date, DecWrapper, Int, SCode, TryConvert, UInt, VariantBool };
 
 const VT_PUI1:      u32 = VT_BYREF | VT_UI1;
 const VT_PI2:       u32 = VT_BYREF | VT_I2;
@@ -171,6 +173,7 @@ mod private {
         };
         ($interm:ty => $f:ty, $vtype:ident, $member:ident, $member_mut:ident) => {
             impl_conversions!(@impl <> $interm, $f, $vtype, $member, $member_mut);
+            impl_conversions!(@impl <'s> &'s mut $interm, $f, $vtype, $member, $member_mut);
         };
         
         ($t:ty, $vtype:ident, $member:ident, $member_mut:ident) => {
@@ -369,6 +372,7 @@ impl<D, T> TryConvert<Ptr<VARIANT>, FromVariantError> for Variant<D, T>
 where
     D: VariantExt<T>
 {
+    /// Converts a [`Ptr<VARIANT>`] to a [`Variant<D, T>`] where D: [`VariantExt<T>`]
     fn try_convert(ptr: Ptr<VARIANT>) -> Result<Self, FromVariantError> {
         Ok(Variant::wrap(VariantExt::<T>::from_variant(ptr)?))
     }
@@ -378,6 +382,9 @@ impl<D, T> TryConvert<Variant<D, T>, IntoVariantError> for Ptr<VARIANT>
 where
     D: VariantExt<T>
 {
+    /// Converts a  [`Variant<D, T>`] to a [`Ptr<VARIANT>`] where D: [`VariantExt<T>`]
+    /// This converts the value *inside* Variant into a Ptr<VARIANT> which is then stuffed
+    /// inside a containing variant by the caller of the method.
     fn try_convert(v: Variant<D, T>) -> Result<Self, IntoVariantError> {
         let v = v.unwrap();
         Ok(VariantExt::<T>::into_variant(v)?)
@@ -388,6 +395,9 @@ impl<D, T> TryConvert<Variant<D, T>, ElementError> for Ptr<VARIANT>
 where
     D: VariantExt<T>
 {
+    /// Converts a  [`Variant<D, T>`] to a [`Ptr<VARIANT>`] where D: [`VariantExt<T>`]
+    /// This converts the value *inside* Variant into a Ptr<VARIANT> which is then stuffed
+    /// inside a containing variant by the caller of the method.
     fn try_convert(v: Variant<D, T>) -> Result<Self, ElementError> {
         let v = v.unwrap();
         Ok(VariantExt::<T>::into_variant(v)?)
@@ -398,6 +408,7 @@ impl<D, T> TryConvert<Ptr<VARIANT> , ElementError> for Variant<D, T>
 where
     D: VariantExt<T>
 {
+    /// Converts a [`Ptr<VARIANT>`] to a [`Variant<D, T>`] where D: [`VariantExt<T>`]
     fn try_convert(ptr: Ptr<VARIANT> ) -> Result<Self, ElementError> {
         Ok(Variant::wrap(VariantExt::<T>::from_variant(ptr)?))
     }
@@ -431,40 +442,40 @@ impl Drop for VariantDestructor {
 
 /// Trait implemented to convert the type into a VARIANT.
 /// Do not implement this yourself without care. 
-pub trait VariantExt<B>: Sized { //Would like Clone, but *mut IDispatch and *mut IUnknown don't implement them
+pub trait VariantExt<B>: Sized { 
     /// VARTYPE constant value for the type
-    const VARTYPE: u32;// = Self::VTYPE;
+    const VARTYPE: u32;
 
-    /// Call this associated function on a `Ptr<VARIANT>` to obtain a value `T`
+    /// Call this associated function on a [`Ptr<VARIANT>`] to obtain a value `T`
     fn from_variant(var: Ptr<VARIANT>) -> Result<Self, FromVariantError>;  
 
-    /// Convert a value of type `T` into a `Ptr<VARIANT>`
+    /// Convert a value of type `T` into a [`Ptr<VARIANT>`]
     fn into_variant(value: Self) -> Result<Ptr<VARIANT>, IntoVariantError>;
 }
 
-/// Blanket implementation where TryConvert implementations exist between I<==>F 
-/// and a private trait is implemented on I.  
-impl<I, F> VariantExt<F> for I
+/// Blanket implementation where TryConvert implementations exist between OutTy<==>InTy 
+/// and a private trait is implemented on OutTy. 
+impl<OutTy, InTy> VariantExt<InTy> for OutTy
 where
-    I: TryConvert<F, FromVariantError> + self::private::VariantAccess<Field=F>,
-    F: TryConvert<I, IntoVariantError>
+    OutTy: TryConvert<InTy, FromVariantError> + self::private::VariantAccess<Field=InTy>,
+    InTy: TryConvert<OutTy, IntoVariantError>
 {
-    const VARTYPE: u32 = I::VTYPE;
+    const VARTYPE: u32 = OutTy::VTYPE;
     fn from_variant(pvar: Ptr<VARIANT>) -> Result<Self, FromVariantError> {
         let var = pvar.as_ptr();
         let _var_d = VariantDestructor::new(var);
         let mut n1 = unsafe {(*var).n1};
         let n3 = unsafe {n1.n2_mut().n3};
-        let inner = I::from_var(&n1, &n3);
-        Ok(<I as TryConvert<F, FromVariantError>>::try_convert(inner)?)
+        let inner = OutTy::from_var(&n1, &n3);
+        Ok(<OutTy as TryConvert<InTy, FromVariantError>>::try_convert(inner)?)
     }
 
-    fn into_variant(value: I) -> Result<Ptr<VARIANT>, IntoVariantError> {
+    fn into_variant(value: OutTy) -> Result<Ptr<VARIANT>, IntoVariantError> {
         let mut n3: VARIANT_n3 = unsafe {mem::zeroed()};
         let mut n1: VARIANT_n1 = unsafe {mem::zeroed()};
-        I::into_var(F::try_convert(value)?, &mut n1, &mut n3);
-        if I::VARTYPE != VT_DECIMAL {
-            let tv = __tagVARIANT { vt: I::VARTYPE as u16, 
+        OutTy::into_var(InTy::try_convert(value)?, &mut n1, &mut n3);
+        if OutTy::VARTYPE != VT_DECIMAL {
+            let tv = __tagVARIANT { vt: OutTy::VARTYPE as u16, 
                             wReserved1: 0, 
                             wReserved2: 0, 
                             wReserved3: 0, 

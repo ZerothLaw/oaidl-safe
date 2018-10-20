@@ -79,7 +79,6 @@ extern crate serde;
 
 extern crate widestring;
 
-
 extern crate winapi;
 
 mod array;
@@ -89,8 +88,8 @@ mod ptr;
 mod types;
 mod variant;
 
-// Types = Ptr, Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool, 
-//  Variant, VtEmpty, VtNull
+// Types = DroppableBString, Ptr, Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool, 
+//  Variant, VtEmpty, VtNull, 
 // Traits = BStringExt, SafeArrayElement, SafeArrayExt, VariantExt
 pub use self::array::{SafeArrayElement, SafeArrayExt};
 pub use self::bstr::{BStringExt, DroppableBString};

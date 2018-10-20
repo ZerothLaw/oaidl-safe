@@ -4,6 +4,9 @@
 //!   * CY
 //!   * DATE
 //!   * DECIMAL
+//!   * VARIANT_BOOL
+//! 
+//! Also implements TryFrom when feature "impl_tryfrom" is turned on in configuration. Only works on Nightly! 
 //! 
 use std::fmt;
 
@@ -36,14 +39,18 @@ where
     T: From<T>, 
     F: failure::Fail 
 {
+    /// Blanket TryConvert implementation wherever a From<T> is implemented for T. (Which is all types.)
+    /// This avoids repetitive code. The compiler monomorphizes the code for F. 
+    /// And because its always an Ok, should optimize this code away. 
     fn try_convert(val: T) -> Result<Self, F> {
         Ok(val)
     }
 }
 
 macro_rules! impl_conv_for_box_wrapper {
-    ($inner:ident, $wrapper:ident) => {
+    ($(#[$attrs:meta])* $inner:ident, $wrapper:ident) => {
         impl TryConvert<Box<$wrapper>,IntoVariantError> for *mut $inner {
+            $(#[$attrs])*
             fn try_convert(b: Box<$wrapper>) -> Result<Self,IntoVariantError> {
                 let b = *b;
                 let inner = $inner::from(b);
@@ -52,6 +59,7 @@ macro_rules! impl_conv_for_box_wrapper {
         }
 
         impl TryConvert<*mut $inner,FromVariantError> for Box<$wrapper> {
+            $(#[$attrs])*
             fn try_convert(inner: *mut $inner) -> Result<Self,FromVariantError> {
                 if inner.is_null() {
                     return Err(FromVariantError::VariantPtrNull);
@@ -110,58 +118,68 @@ macro_rules! wrapper_conv_impl {
 macro_rules! conversions_impl {
     ($inner:ident, $wrapper:ident) => {
         impl TryConvert<$inner,FromVariantError> for $wrapper {
+            /// Does not return any errors.
             fn try_convert(val: $inner) -> Result<Self,FromVariantError> {
                 Ok($wrapper::from(val))
             }
         }
 
         impl TryConvert<$wrapper,IntoVariantError> for $inner {
+            /// Does not return any errors.
             fn try_convert(val: $wrapper) -> Result<Self,IntoVariantError> {
                 Ok($inner::from(val))
             }
         }
 
         impl<'c> TryConvert<&'c $inner,FromVariantError> for $wrapper {
+            /// Does not return any errors.
             fn try_convert(val: &$inner) -> Result<Self,FromVariantError> {
                 Ok($wrapper::from(val))
             }
         }
 
         impl<'c> TryConvert<&'c $wrapper,IntoVariantError> for $inner {
+            /// Does not return any errors.
             fn try_convert(val: &$wrapper) -> Result<Self,IntoVariantError> {
                 Ok($inner::from(val))
             }
         }
 
         impl<'c> TryConvert<&'c mut $inner,FromVariantError> for $wrapper {
+            /// Does not return any errors.
             fn try_convert(val: &mut $inner) -> Result<Self,FromVariantError> {
                 Ok($wrapper::from(val))
             }
         }
 
         impl<'c> TryConvert<&'c mut $wrapper,IntoVariantError> for $inner {
+            /// Does not return any errors.
             fn try_convert(val: &mut $wrapper) -> Result<Self,IntoVariantError> {
                 Ok($inner::from(val))
             }
         }
 
         impl TryConvert<$inner, SafeArrayError> for $wrapper {
+            /// Does not return any errors.
             fn try_convert(val: $inner) -> Result<Self,SafeArrayError> {
                 Ok($wrapper::from(val))
             }
         } 
         impl TryConvert<$wrapper, SafeArrayError> for $inner {
+            /// Does not return any errors.
             fn try_convert(val: $wrapper) -> Result<Self, SafeArrayError> {
                 Ok($inner::from(val))
             }
         }
 
         impl TryConvert<$inner, ElementError> for $wrapper {
+            /// Does not return any errors.
             fn try_convert(val: $inner) -> Result<Self,ElementError> {
                 Ok($wrapper::from(val))
             }
         } 
         impl TryConvert<$wrapper, ElementError> for $inner {
+            /// Does not return any errors.
             fn try_convert(val: $wrapper) -> Result<Self, ElementError> {
                 Ok($inner::from(val))
             }
@@ -175,32 +193,38 @@ macro_rules! conversions_impl {
 pub struct Currency(i64);
 
 impl From<CY> for Currency {
+    /// Converts CY to Currency. Consumes the CY, and copies the internal value.
     fn from(cy: CY) -> Currency {
         Currency(cy.int64)
     }
 }
 impl<'c> From<&'c CY> for Currency {
+    /// Converts CY to Currency. Copies the internal value from the reference.
     fn from(cy: &CY) -> Currency {
         Currency(cy.int64)
     }
 }
 impl<'c> From<&'c mut CY> for Currency {
+    /// Converts CY to Currency. Copies the internal value from the reference.
     fn from(cy: &mut CY) -> Currency {
         Currency(cy.int64)
     }
 }
 
 impl From<Currency> for CY {
+    /// Converts Currency to CY. Consumes the Currency and copies the internal value to CY.
     fn from(cy: Currency) -> CY {
         CY {int64: cy.0}
     }
 }
 impl<'c> From<&'c Currency> for CY {
+    /// Converts Currency to CY. Copies the internal value from the reference.
     fn from(cy: &Currency) -> CY {
         CY {int64: cy.0}
     }
 }
 impl<'c> From<&'c mut Currency> for CY {
+    /// Converts Currency to CY. Copies the internal value from the reference.
     fn from(cy: &mut Currency) -> CY {
         CY {int64: cy.0}
     }
@@ -258,7 +282,7 @@ impl DecWrapper {
     pub fn borrow_mut(&mut self) -> &mut Decimal {
         &mut self.0
     }
-
+    // Internal conversion function
     fn build_c_decimal(dec: &Decimal) -> DECIMAL {
         let scale = dec.scale() as u8;
         let sign = if dec.is_sign_positive() {0} else {DECIMAL_NEG};
@@ -305,16 +329,22 @@ impl DecWrapper {
 
 //DECIMAL to DecWrapper conversions
 impl From<DECIMAL> for DecWrapper {
+    /// Converts DECIMAL into a Decimal wrapped in a DecWrapper.
+    /// Allocates a new Decimal.
     fn from(d: DECIMAL) -> DecWrapper {
         DecWrapper(DecWrapper::build_rust_decimal(&d))
     }
 }
 impl<'d> From<&'d DECIMAL> for DecWrapper {
+    /// Converts DECIMAL into a Decimal wrapped in a DecWrapper
+    /// Allocates a new Decimal.
     fn from(d: &DECIMAL) -> DecWrapper {
         DecWrapper(DecWrapper::build_rust_decimal(d))
     }
 }
 impl<'d> From<&'d mut DECIMAL> for DecWrapper {
+    /// Converts DECIMAL into a Decimal wrapped in a DecWrapper
+    /// Allocates a new Decimal.
     fn from(d: &mut DECIMAL) -> DecWrapper {
         DecWrapper(DecWrapper::build_rust_decimal(d))
     }
@@ -322,16 +352,22 @@ impl<'d> From<&'d mut DECIMAL> for DecWrapper {
 
 //DecWrapper to DECIMAL conversions
 impl From<DecWrapper> for DECIMAL {
+    /// Converts a DecWrapper into  DECIMAL. 
+    /// Allocates a new DECIMAL
     fn from(d: DecWrapper) -> DECIMAL {
         DecWrapper::build_c_decimal(&d.0)
     }
 }
 impl<'d> From<&'d DecWrapper> for DECIMAL {
+    /// Converts a DecWrapper into  DECIMAL. 
+    /// Allocates a new DECIMAL
     fn from(d: &DecWrapper) -> DECIMAL {
         DecWrapper::build_c_decimal(&d.0)
     }
 }
 impl<'d> From<&'d mut DecWrapper> for DECIMAL {
+    /// Converts a DecWrapper into  DECIMAL. 
+    /// Allocates a new DECIMAL
     fn from(d: & mut DecWrapper) -> DECIMAL {
         DecWrapper::build_c_decimal(&d.0)
     }
@@ -339,16 +375,22 @@ impl<'d> From<&'d mut DecWrapper> for DECIMAL {
 
 //DecWrapper to Decimal conversions
 impl From<DecWrapper> for Decimal {
+    /// Converts a DecWrapper into Decimal. 
+    /// Zero cost or allocations.
     fn from(dw: DecWrapper) -> Decimal {
         dw.0
     }
 }
 impl<'w> From<&'w DecWrapper> for Decimal {
+    /// Converts a DecWrapper into Decimal. 
+    /// Zero cost or allocations.
     fn from(dw: &DecWrapper) -> Decimal {
         dw.0
     }
 }
 impl<'w> From<&'w mut DecWrapper> for Decimal {
+    /// Converts a DecWrapper into Decimal. 
+    /// Zero cost or allocations.
     fn from(dw: &mut DecWrapper) -> Decimal {
         dw.0
     }
@@ -356,16 +398,22 @@ impl<'w> From<&'w mut DecWrapper> for Decimal {
 
 //Decimal to DecWrapper conversions
 impl From<Decimal> for DecWrapper {
+    /// Converts a Decimal into a DecWrapper.
+    /// Zero cost or allocations.
     fn from(dec: Decimal) -> DecWrapper {
         DecWrapper(dec)
     }
 }
 impl<'d> From<&'d Decimal> for DecWrapper {
+    /// Converts a Decimal into a DecWrapper.
+    /// Zero cost or allocations.
     fn from(dec: &Decimal) -> DecWrapper {
         DecWrapper(dec.clone())
     }
 }
 impl<'d> From<&'d mut Decimal> for DecWrapper {
+    /// Converts a Decimal into a DecWrapper.
+    /// Zero cost or allocations.
     fn from(dec: &mut Decimal) -> DecWrapper {
         DecWrapper(dec.clone())
     }
@@ -379,37 +427,47 @@ impl AsRef<Decimal> for DecWrapper {
 conversions_impl!(DECIMAL, DecWrapper);
 
 /// Helper type for the OLE/COM+ type VARIANT_BOOL
+/// 
+/// A VARIANT_Bool represents true as 0x0, and false as 0xFFFF. 
+/// 
+/// This means there's a bit of conversion logic required. 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct VariantBool(bool);
 
 impl From<VariantBool> for VARIANT_BOOL {
+    /// Converts a VariantBool into a VARIANT_BOOL. 
     fn from(vb: VariantBool) -> VARIANT_BOOL {
         if vb.0 {VARIANT_TRUE} else {0}
     }
 }
 impl<'v> From<&'v VariantBool> for VARIANT_BOOL {
+    /// Converts a VariantBool into a VARIANT_BOOL. 
     fn from(vb: &VariantBool) -> VARIANT_BOOL {
         if vb.0 {VARIANT_TRUE} else {0}
     }
 }
 impl<'v> From<&'v mut VariantBool> for VARIANT_BOOL {
+    /// Converts a VariantBool into a VARIANT_BOOL. 
     fn from(vb: &mut VariantBool) -> VARIANT_BOOL {
         if vb.0 {VARIANT_TRUE} else {0}
     }
 }
 
 impl From<VARIANT_BOOL> for VariantBool {
+    /// Converts a VARIANT_BOOL into a VariantBool. 
     fn from(vb: VARIANT_BOOL) -> VariantBool {
         VariantBool(vb < 0) 
     }
 }
 impl<'v> From<&'v VARIANT_BOOL> for VariantBool {
+    /// Converts a VARIANT_BOOL into a VariantBool. 
     fn from(vb: &VARIANT_BOOL) -> VariantBool {
         VariantBool(*vb < 0) 
     }
 }
 impl<'v> From<&'v mut VARIANT_BOOL> for VariantBool {
+    /// Converts a VARIANT_BOOL into a VariantBool. 
     fn from(vb: &mut VARIANT_BOOL) -> VariantBool {
         VariantBool(*vb < 0) 
     }

@@ -44,10 +44,24 @@ pub trait BStringExt {
     /// Allocates a [`Ptr<u16>`] (aka a `*mut u16` aka a BSTR)
     fn allocate_bstr(&mut self) -> Result<Ptr<u16>, BStringError>;
 
+    /// Allocates a [`Ptr<u16>`] (aka a `*mut u16` aka a BSTR)
+    /// 
+    /// ### Memory handling
+    /// 
+    /// Consumes input. Input value will be dropped. 
+    fn consume_to_bstr(self) -> Result<Ptr<u16>, BStringError>;
+
     /// Allocates a [`DroppableBString`] container - automatically frees the memory properly if dropped.
     fn allocate_managed_bstr(&mut self) -> Result<DroppableBString, BStringError>;
 
-    /// Manually and correct free the memory allocated via Sys* methods
+    /// Allocates a [`DroppableBString`] container - automatically frees the memory properly if dropped.
+    /// 
+    /// ### Memory handling
+    /// 
+    /// Consumes input. Input value will be dropped. 
+    fn consume_to_managed_bstr(self) -> Result<DroppableBString, BStringError>;
+
+    /// Manually and correctly free the memory allocated via Sys* methods
     fn deallocate_bstr(bstr: Ptr<u16>);
     
     /// Convenience method for conversion to a good intermediary type
@@ -64,8 +78,17 @@ pub trait BStringExt {
 impl BStringExt for U16String {
     fn allocate_bstr(&mut self) -> Result<Ptr<u16>, BStringError> {
         let sz = self.len();
-        let cln = self.clone();
-        let rw = cln.as_ptr();
+        let rw = self.as_ptr();
+        let bstr: BSTR = unsafe {SysAllocStringLen(rw, sz as u32)};
+        match Ptr::with_checked(bstr) {
+            Some(pbstr) => Ok(pbstr), 
+            None => Err(BStringError::AllocateFailed{len: sz})
+        }
+    }
+
+    fn consume_to_bstr(self) -> Result<Ptr<u16>, BStringError> {
+        let sz = self.len();
+        let rw = self.as_ptr();
         let bstr: BSTR = unsafe {SysAllocStringLen(rw, sz as u32)};
         match Ptr::with_checked(bstr) {
             Some(pbstr) => Ok(pbstr), 
@@ -75,6 +98,10 @@ impl BStringExt for U16String {
 
     fn allocate_managed_bstr(&mut self) -> Result<DroppableBString, BStringError> {
         Ok(DroppableBString{ inner: Some(self.allocate_bstr()?) })
+    }
+
+    fn consume_to_managed_bstr(self) -> Result<DroppableBString, BStringError> {
+        Ok(DroppableBString{ inner: Some(self.consume_to_bstr()?) })
     }
 
     fn deallocate_bstr(bstr: Ptr<u16>) {
@@ -116,6 +143,24 @@ impl BStringExt for U16String {
 /// 
 /// If you have a memory leak and you're using this type, 
 /// then check your use of consume. 
+/// 
+/// ## Example
+/// 
+/// ```
+/// extern crate oaidl;
+/// extern crate widestring;
+/// 
+/// use oaidl::{BStringError, BStringExt, DroppableBString};
+/// use widestring::U16String;
+/// 
+/// fn main() -> Result<(), BStringError> {
+///     let s = U16String::from_str("The first step to doing anything is to believe you can do it. See it finished in your mind before you ever start. It takes dark in order to show light.");
+///     let dbs = s.consume_to_managed_bstr()?;
+///     drop(dbs); // Correctly deallocates allocated memory.
+///     Ok(())
+/// }
+/// ```
+#[derive( Debug, Eq, Hash, PartialEq, PartialOrd)]
 pub struct DroppableBString {
     inner: Option<Ptr<u16>>
 }
@@ -129,7 +174,6 @@ impl DroppableBString {
     /// 
     /// This method is very unsafe to use unless you know
     /// how to handle it correctly, hence the `unsafe` marker. 
-    #[allow(dead_code)]
     pub unsafe fn consume(&mut self) -> *mut u16 {
         let ret = match self.inner {
             Some(ptr) => ptr.as_ptr(), 
@@ -141,6 +185,9 @@ impl DroppableBString {
 }
 
 impl Drop for DroppableBString {
+    /// Handles freeing the allocated BSTR correctly via `SysFreeString`. 
+    /// The only (safe) way to construct a [`DroppableBString`] is via 
+    /// an [`allocate_managed_bstr`] call. 
     fn drop(&mut self) {
         match self.inner {
             Some(ptr) => {
@@ -152,18 +199,34 @@ impl Drop for DroppableBString {
 }
 
 impl TryConvert<U16String, IntoVariantError> for BSTR {
+    /// Clones input, then allocates a new BSTR. 
+    /// 
+    /// ### Errors
+    /// 
+    /// Allocation can throw [`BStringError`]. 
     fn try_convert(u: U16String) -> Result<Self, IntoVariantError> {
         Ok(u.clone().allocate_bstr()?.as_ptr())
     }
 }
 
 impl TryConvert<BSTR, FromVariantError> for U16String {
+    /// Converts the BSTR to a U16String.
+    /// 
+    /// ### Panics
+    /// 
+    /// Will panic if BSTR is null. 
     fn try_convert(p: BSTR) -> Result<Self, FromVariantError> {
+        assert!(!p.is_null(), "BSTR ptr was null.");
         Ok(U16String::from_bstr(p))
     }
 }
 
 impl TryConvert<U16String, SafeArrayError> for BSTR {
+    /// Clones input, then allocates a new BSTR. 
+    /// 
+    /// ### Errors
+    /// 
+    /// Allocation can throw [`SafeArrayError`].
     fn try_convert(u: U16String) -> Result<Self, SafeArrayError> {
         match u.clone().allocate_bstr() {
             Ok(ptr) => Ok(ptr.as_ptr()), 
@@ -173,6 +236,11 @@ impl TryConvert<U16String, SafeArrayError> for BSTR {
 }
 
 impl TryConvert<U16String, ElementError> for BSTR {
+    /// Clones input, then allocates a new BSTR. 
+    /// 
+    /// ### Errors
+    /// 
+    /// Allocation can throw [`ElementError`].
     fn try_convert(u: U16String) -> Result<Self,ElementError> {
          match u.clone().allocate_bstr() {
             Ok(ptr) => Ok(ptr.as_ptr()), 
@@ -182,7 +250,13 @@ impl TryConvert<U16String, ElementError> for BSTR {
 }
 
 impl TryConvert<BSTR, ElementError> for U16String {
-    fn try_convert(b: BSTR) -> Result<Self, ElementError> {
-        Ok(U16String::from_bstr(b))
+    /// Converts the BSTR to a U16String.
+    /// 
+    /// ### Panics
+    /// 
+    /// Will panic if BSTR is null. 
+    fn try_convert(ptr: BSTR) -> Result<Self, ElementError> {
+        assert!(!ptr.is_null(), "BSTR ptr was null.");
+        Ok(U16String::from_bstr(ptr))
     }
 }
