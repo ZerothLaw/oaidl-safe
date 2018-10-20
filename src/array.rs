@@ -94,14 +94,31 @@ impl<T> Drop for EmptyMemoryDestructor<T> {
 /// 
 /// Implemented for types:
 /// 
-/// * `i8`, `u8`, `i16`, `u16`, `i32`, `u32`
-/// * `bool`, `f32`, `f64`
-/// * `String`, [`Variant<T>`], 
+/// * [`i8`], [`u8`], [`i16`], [`u16`], [`i32`], [`u32`]
+/// * [`bool`], [`f32`], [`f64`]
+/// * [`String`], [`Variant<T>`], 
 /// * [`Ptr<IUnknown>`], [`Ptr<IDispatch>`]
 ///  
 /// [`Variant<T>`]: struct.Variant.html
 /// [`Ptr<IUnknown>`]: struct.Ptr.html
 /// [`Ptr<IDispatch>`]: struct.Ptr.html
+/// [`i8`]: https://doc.rust-lang.org/std/i8/index.html
+/// [`u8`]: https://doc.rust-lang.org/std/u8/index.html
+/// [`f32`]: https://doc.rust-lang.org/std/f32/index.html
+/// [`f64`]: https://doc.rust-lang.org/std/f64/index.html
+/// [`i16`]: https://doc.rust-lang.org/std/i16/index.html
+/// [`i32`]: https://doc.rust-lang.org/std/i32/index.html
+/// [`i64`]: https://doc.rust-lang.org/std/i64/index.html
+/// [`u16`]: https://doc.rust-lang.org/std/u16/index.html
+/// [`u32`]: https://doc.rust-lang.org/std/u32/index.html
+/// [`u64`]: https://doc.rust-lang.org/std/u64/index.html
+/// [`String`]: https://doc.rust-lang.org/std/string/struct.String.html
+/// [`bool`]: https://doc.rust-lang.org/std/primitive.bool.html
+/// [`SCode`]: struct.SCode.html
+/// [`Currency`]: struct.Currency.html
+/// [`Date`]: struct.Date.html
+/// [`Int`]: struct.Int.html
+/// [`UInt`]: struct.UInt.html 
 /// 
 /// ## Example usage
 /// 
@@ -181,12 +198,14 @@ impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for `i16`. This allows it to 
 impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for `i32`. This allows it to be converted into SAFEARRAY with vt = `VT_I4`."] i32, VT_I4);
 impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for `f32`. This allows it to be converted into SAFEARRAY with vt = `VT_R4`."] f32, VT_R4);
 impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for `f64`. This allows it to be converted into SAFEARRAY with vt = `VT_R8`."] f64, VT_R8);
-impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for [`Currency`]. This allows it to be converted into SAFEARRAY with vt = `VT_CY`."] Currency => CY, VT_CY);
-impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for ['Date']. This allows it to be converted into SAFEARRAY with vt = `VT_DATE`."] Date => DATE, VT_DATE);
+impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for [`Currency`]:struct.Currency.html . This allows it to be converted into SAFEARRAY with vt = `VT_CY`."] Currency => CY, VT_CY);
+impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for ['Date']: struct.Date.html. This allows it to be converted into SAFEARRAY with vt = `VT_DATE`."] Date => DATE, VT_DATE);
 
-/// `SafeArrayElement` impl for ['U16String']. This allows it to be converted into SAFEARRAY with vt = `VT_BSTR`.
-/// This overrides the default implementation of `into_safearray` because *mut *mut u16 is the incorrect
+/// `SafeArrayElement` impl for [`U16String`]. This allows it to be converted into SAFEARRAY with vt = `VT_BSTR`.
+/// This overrides the default implementation of `into_safearray` because `*mut *mut u16` is the incorrect
 /// type to put in a SAFEARRAY. 
+/// 
+/// [`U16String`]: https://docs.rs/widestring/0.4.0/widestring/type.U16String.html
 impl SafeArrayElement for U16String {
     const SFTYPE: u32 = VT_BSTR;
     type Element = BSTR;
@@ -204,8 +223,8 @@ impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for ['SCode']. This allows it
 impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for ['VariantBool']. This allows it to be converted into SAFEARRAY with vt = `VT_BOOL`."]VariantBool => VARIANT_BOOL, VT_BOOL);
 
 /// SafeArrayElement` impl for ['Variant<D,T>']. This allows it to be converted into SAFEARRAY with vt = `VT_VARIANT`.
-/// This overrides the default impl of `from_safearray` and `into_safearray` because *mut VARIANT doesn't need 
-/// an additional indirection to be put into a SAFEARRAY. 
+/// This overrides the default impl of `from_safearray` and `into_safearray` because `*mut VARIANT` doesn't need 
+/// an additional indirection to be put into a `SAFEARRAY`. 
 impl<D, T> SafeArrayElement for Variant<D, T> 
 where
     D: VariantExt<T>
