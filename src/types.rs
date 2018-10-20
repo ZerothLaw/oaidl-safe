@@ -22,7 +22,7 @@ use rust_decimal::Decimal;
 
 use winapi::shared::wtypes::{CY, DECIMAL, DECIMAL_NEG, VARIANT_BOOL, VARIANT_TRUE};
 
-use errors::{ConversionError, ElementError, FromVariantError, IntoVariantError, SafeArrayError};
+use super::errors::{ConversionError, ElementError, FromVariantError, IntoVariantError, SafeArrayError};
 
 /// Pseudo-`From` trait because of orphan rules
 pub trait TryConvert<T, F> 
@@ -81,13 +81,13 @@ macro_rules! wrapper_conv_impl {
         }
 
         impl<'f> From<&'f $inner> for $wrapper {
-            fn from(i: &$inner) -> Self {
+            fn from(i: &'f $inner) -> Self {
                 $wrapper(*i)
             }
         }
 
         impl<'f> From<&'f mut $inner> for $wrapper {
-            fn from(i: &mut $inner) -> Self {
+            fn from(i: &'f mut $inner) -> Self {
                 $wrapper(*i)
             }
         }
@@ -99,13 +99,13 @@ macro_rules! wrapper_conv_impl {
         }
 
         impl<'f> From<&'f $wrapper> for $inner {
-            fn from(o: &$wrapper) -> Self {
+            fn from(o: &'f $wrapper) -> Self {
                 o.0
             }
         }
 
         impl<'f> From<&'f mut $wrapper> for $inner {
-            fn from(o: &mut $wrapper) -> Self {
+            fn from(o: &'f mut $wrapper) -> Self {
                 o.0
             }
         }
@@ -133,28 +133,28 @@ macro_rules! conversions_impl {
 
         impl<'c> TryConvert<&'c $inner,FromVariantError> for $wrapper {
             /// Does not return any errors.
-            fn try_convert(val: &$inner) -> Result<Self,FromVariantError> {
+            fn try_convert(val: &'c $inner) -> Result<Self,FromVariantError> {
                 Ok($wrapper::from(val))
             }
         }
 
         impl<'c> TryConvert<&'c $wrapper,IntoVariantError> for $inner {
             /// Does not return any errors.
-            fn try_convert(val: &$wrapper) -> Result<Self,IntoVariantError> {
+            fn try_convert(val: &'c $wrapper) -> Result<Self,IntoVariantError> {
                 Ok($inner::from(val))
             }
         }
 
         impl<'c> TryConvert<&'c mut $inner,FromVariantError> for $wrapper {
             /// Does not return any errors.
-            fn try_convert(val: &mut $inner) -> Result<Self,FromVariantError> {
+            fn try_convert(val: &'c mut $inner) -> Result<Self,FromVariantError> {
                 Ok($wrapper::from(val))
             }
         }
 
         impl<'c> TryConvert<&'c mut $wrapper,IntoVariantError> for $inner {
             /// Does not return any errors.
-            fn try_convert(val: &mut $wrapper) -> Result<Self,IntoVariantError> {
+            fn try_convert(val: &'c mut $wrapper) -> Result<Self,IntoVariantError> {
                 Ok($inner::from(val))
             }
         }
@@ -200,13 +200,13 @@ impl From<CY> for Currency {
 }
 impl<'c> From<&'c CY> for Currency {
     /// Converts CY to Currency. Copies the internal value from the reference.
-    fn from(cy: &CY) -> Currency {
+    fn from(cy: &'c CY) -> Currency {
         Currency(cy.int64)
     }
 }
 impl<'c> From<&'c mut CY> for Currency {
     /// Converts CY to Currency. Copies the internal value from the reference.
-    fn from(cy: &mut CY) -> Currency {
+    fn from(cy: &'c mut CY) -> Currency {
         Currency(cy.int64)
     }
 }
@@ -219,13 +219,13 @@ impl From<Currency> for CY {
 }
 impl<'c> From<&'c Currency> for CY {
     /// Converts Currency to CY. Copies the internal value from the reference.
-    fn from(cy: &Currency) -> CY {
+    fn from(cy: &'c Currency) -> CY {
         CY {int64: cy.0}
     }
 }
 impl<'c> From<&'c mut Currency> for CY {
     /// Converts Currency to CY. Copies the internal value from the reference.
-    fn from(cy: &mut Currency) -> CY {
+    fn from(cy: &'c mut Currency) -> CY {
         CY {int64: cy.0}
     }
 }
@@ -338,14 +338,14 @@ impl From<DECIMAL> for DecWrapper {
 impl<'d> From<&'d DECIMAL> for DecWrapper {
     /// Converts DECIMAL into a Decimal wrapped in a DecWrapper
     /// Allocates a new Decimal.
-    fn from(d: &DECIMAL) -> DecWrapper {
+    fn from(d: &'d DECIMAL) -> DecWrapper {
         DecWrapper(DecWrapper::build_rust_decimal(d))
     }
 }
 impl<'d> From<&'d mut DECIMAL> for DecWrapper {
     /// Converts DECIMAL into a Decimal wrapped in a DecWrapper
     /// Allocates a new Decimal.
-    fn from(d: &mut DECIMAL) -> DecWrapper {
+    fn from(d: &'d mut DECIMAL) -> DecWrapper {
         DecWrapper(DecWrapper::build_rust_decimal(d))
     }
 }
@@ -361,14 +361,14 @@ impl From<DecWrapper> for DECIMAL {
 impl<'d> From<&'d DecWrapper> for DECIMAL {
     /// Converts a DecWrapper into  DECIMAL. 
     /// Allocates a new DECIMAL
-    fn from(d: &DecWrapper) -> DECIMAL {
+    fn from(d: &'d DecWrapper) -> DECIMAL {
         DecWrapper::build_c_decimal(&d.0)
     }
 }
 impl<'d> From<&'d mut DecWrapper> for DECIMAL {
     /// Converts a DecWrapper into  DECIMAL. 
     /// Allocates a new DECIMAL
-    fn from(d: & mut DecWrapper) -> DECIMAL {
+    fn from(d: &'d mut DecWrapper) -> DECIMAL {
         DecWrapper::build_c_decimal(&d.0)
     }
 }
@@ -384,14 +384,14 @@ impl From<DecWrapper> for Decimal {
 impl<'w> From<&'w DecWrapper> for Decimal {
     /// Converts a DecWrapper into Decimal. 
     /// Zero cost or allocations.
-    fn from(dw: &DecWrapper) -> Decimal {
+    fn from(dw: &'w DecWrapper) -> Decimal {
         dw.0
     }
 }
 impl<'w> From<&'w mut DecWrapper> for Decimal {
     /// Converts a DecWrapper into Decimal. 
     /// Zero cost or allocations.
-    fn from(dw: &mut DecWrapper) -> Decimal {
+    fn from(dw: &'w mut DecWrapper) -> Decimal {
         dw.0
     }
 }
@@ -407,14 +407,14 @@ impl From<Decimal> for DecWrapper {
 impl<'d> From<&'d Decimal> for DecWrapper {
     /// Converts a Decimal into a DecWrapper.
     /// Zero cost or allocations.
-    fn from(dec: &Decimal) -> DecWrapper {
+    fn from(dec: &'d Decimal) -> DecWrapper {
         DecWrapper(dec.clone())
     }
 }
 impl<'d> From<&'d mut Decimal> for DecWrapper {
     /// Converts a Decimal into a DecWrapper.
     /// Zero cost or allocations.
-    fn from(dec: &mut Decimal) -> DecWrapper {
+    fn from(dec: &'d mut Decimal) -> DecWrapper {
         DecWrapper(dec.clone())
     }
 }
@@ -443,13 +443,13 @@ impl From<VariantBool> for VARIANT_BOOL {
 }
 impl<'v> From<&'v VariantBool> for VARIANT_BOOL {
     /// Converts a VariantBool into a VARIANT_BOOL. 
-    fn from(vb: &VariantBool) -> VARIANT_BOOL {
+    fn from(vb: &'v VariantBool) -> VARIANT_BOOL {
         if vb.0 {VARIANT_TRUE} else {0}
     }
 }
 impl<'v> From<&'v mut VariantBool> for VARIANT_BOOL {
     /// Converts a VariantBool into a VARIANT_BOOL. 
-    fn from(vb: &mut VariantBool) -> VARIANT_BOOL {
+    fn from(vb: &'v mut VariantBool) -> VARIANT_BOOL {
         if vb.0 {VARIANT_TRUE} else {0}
     }
 }
@@ -462,13 +462,13 @@ impl From<VARIANT_BOOL> for VariantBool {
 }
 impl<'v> From<&'v VARIANT_BOOL> for VariantBool {
     /// Converts a VARIANT_BOOL into a VariantBool. 
-    fn from(vb: &VARIANT_BOOL) -> VariantBool {
+    fn from(vb: &'v VARIANT_BOOL) -> VariantBool {
         VariantBool(*vb < 0) 
     }
 }
 impl<'v> From<&'v mut VARIANT_BOOL> for VariantBool {
     /// Converts a VARIANT_BOOL into a VariantBool. 
-    fn from(vb: &mut VARIANT_BOOL) -> VariantBool {
+    fn from(vb: &'v mut VARIANT_BOOL) -> VariantBool {
         VariantBool(*vb < 0) 
     }
 }
@@ -480,13 +480,13 @@ impl From<bool> for VariantBool {
 }
 
 impl<'b> From<&'b bool> for VariantBool {
-    fn from(b: &bool) -> Self {
+    fn from(b: &'b bool) -> Self {
         VariantBool(*b)
     }
 }
 
 impl<'b> From<&'b mut bool> for VariantBool {
-    fn from(b: &mut bool) -> Self {
+    fn from(b: &'b mut bool) -> Self {
         VariantBool(*b)
     }
 }
@@ -497,12 +497,12 @@ impl From<VariantBool> for bool {
     }
 }
 impl<'v> From<&'v VariantBool> for bool {
-    fn from(b: &VariantBool) -> Self {
+    fn from(b: &'v VariantBool) -> Self {
         b.0
     }
 }
 impl<'v> From<&'v mut VariantBool> for bool {
-    fn from(b: &mut VariantBool) -> Self {
+    fn from(b: &'v mut VariantBool) -> Self {
         b.0
     }
 }

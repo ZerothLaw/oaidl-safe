@@ -61,7 +61,7 @@ macro_rules! check_and_throw {
 
 // Handles dropping zeroed memory (technically initialized, but can't be dropped.)
 struct EmptyMemoryDestructor<T> {
-    pub inner: *mut T, 
+    pub(crate) inner: *mut T, 
     _marker: PhantomData<T>
 }
 
@@ -154,6 +154,7 @@ where
     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self::Element, ElementError> {
         let mut def_val: Self::Element = unsafe {mem::zeroed()};
         let mut empty = EmptyMemoryDestructor::new(&mut def_val);
+        #[allow(trivial_casts)]
         let hr = unsafe {SafeArrayGetElement(psa, &ix, &mut def_val as *mut _ as *mut c_void)};
         match hr {
             0 => {
@@ -169,6 +170,7 @@ where
     #[doc(hidden)]
     fn into_safearray(self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), ElementError> {
         let mut slf = Self::Element::try_convert(self)?;
+        #[allow(trivial_casts)]
         let hr = unsafe { SafeArrayPutElement(psa, &ix, &mut slf as *mut _ as *mut c_void)};
         match hr {
             0 => Ok(()), 
@@ -212,7 +214,7 @@ impl SafeArrayElement for U16String {
 
     fn into_safearray(self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), ElementError> {
         let slf = <BSTR as TryConvert<U16String, ElementError>>::try_convert(self)?;
-        let hr = unsafe { SafeArrayPutElement(psa, &ix, slf as *mut _ as *mut c_void)};
+        let hr = unsafe { SafeArrayPutElement(psa, &ix, slf as *mut c_void)};
         match hr {
             0 => Ok(()), 
             _ => Err(ElementError::from(IntoSafeArrElemError::PutElementFailed{hr: hr}))
@@ -236,6 +238,7 @@ where
     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self::Element, ElementError> {
         let mut def_val: VARIANT = unsafe {mem::zeroed()};
         let mut empty = EmptyMemoryDestructor::new(&mut def_val);
+        #[allow(trivial_casts)]
         let hr = unsafe {SafeArrayGetElement(psa, &ix, &mut def_val as *mut _ as *mut c_void)};
         match hr {
             0 => {
@@ -251,7 +254,7 @@ where
     #[doc(hidden)]
     fn into_safearray(self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), ElementError> {
         let slf = <Ptr<VARIANT> as TryConvert<Variant<D, T>, ElementError>>::try_convert(self)?;
-        let hr = unsafe { SafeArrayPutElement(psa, &ix, slf.as_ptr() as *mut _ as *mut c_void)};
+        let hr = unsafe { SafeArrayPutElement(psa, &ix, slf.as_ptr() as *mut c_void)};
         match hr {
             0 => Ok(()), 
             _ => Err(ElementError::from(IntoSafeArrElemError::PutElementFailed{hr: hr}))
@@ -281,6 +284,7 @@ impl SafeArrayElement for Ptr<IUnknown> {
     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self::Element, ElementError> {
         let mut def_val: IUnknown = unsafe {mem::zeroed()};
         let mut empty = EmptyMemoryDestructor::new(&mut def_val);
+        #[allow(trivial_casts)]
         let hr = unsafe {SafeArrayGetElement(psa, &ix, &mut def_val as *mut _ as *mut c_void)};
         match hr {
             0 => {
@@ -296,7 +300,7 @@ impl SafeArrayElement for Ptr<IUnknown> {
     #[doc(hidden)]
     fn into_safearray(self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), ElementError> {
         let slf = self.as_ptr();
-        let hr = unsafe { SafeArrayPutElement(psa, &ix, slf as *mut _ as *mut c_void)};
+        let hr = unsafe { SafeArrayPutElement(psa, &ix, slf as *mut c_void)};
         match hr {
             0 => Ok(()), 
             _ => Err(ElementError::from(IntoSafeArrElemError::PutElementFailed{hr: hr}))
@@ -318,6 +322,7 @@ impl SafeArrayElement for Ptr<IDispatch> {
     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self::Element, ElementError> {
         let mut def_val: IDispatch = unsafe {mem::zeroed()};
         let mut empty = EmptyMemoryDestructor::new(&mut def_val);
+        #[allow(trivial_casts)]
         let hr = unsafe {SafeArrayGetElement(psa, &ix, &mut def_val as *mut _ as *mut c_void)};
         match hr {
             0 => {
@@ -333,7 +338,7 @@ impl SafeArrayElement for Ptr<IDispatch> {
     #[doc(hidden)]
     fn into_safearray(self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), ElementError> {
         let slf = self.as_ptr();
-        let hr = unsafe { SafeArrayPutElement(psa, &ix, slf as *mut _ as *mut c_void)};
+        let hr = unsafe { SafeArrayPutElement(psa, &ix, slf as *mut c_void)};
         match hr {
             0 => Ok(()), 
             _ => Err(ElementError::from(IntoSafeArrElemError::PutElementFailed{hr: hr}))

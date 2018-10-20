@@ -84,7 +84,7 @@ mod private {
     use super::*;
 
     #[doc(hidden)]
-    pub trait Sealed {}
+    pub(crate) trait Sealed {}
 
     #[doc(hidden)]
     pub trait VariantAccess: Sized {
@@ -119,7 +119,7 @@ mod private {
             }
         };
         ( < $($tl:lifetime,)* $tn:ident : $tb:ident > $t:ty, $field:ty, $vtype:ident, $member:ident, $member_mut:ident ) => {
-            impl<$($tl,)* $tn> VariantAccess for $t 
+            impl<$($tl,)* $tn> VariantAccess for $(&$tl)* $t 
             where
                 $tn: $tb
             {
@@ -173,13 +173,10 @@ mod private {
         };
         ($interm:ty => $f:ty, $vtype:ident, $member:ident, $member_mut:ident) => {
             impl_conversions!(@impl <> $interm, $f, $vtype, $member, $member_mut);
-            impl_conversions!(@impl <'s> &'s mut $interm, $f, $vtype, $member, $member_mut);
         };
         
         ($t:ty, $vtype:ident, $member:ident, $member_mut:ident) => {
             impl_conversions!(@impl <> $t, $t, $vtype, $member, $member_mut);
-            impl_conversions!(@impl <'s> &'s $t, $t, $vtype, $member, $member_mut);
-            impl_conversions!(@impl <'s> &'s mut $t, $t, $vtype, $member, $member_mut);
         };
         
     }
@@ -209,7 +206,8 @@ mod private {
     impl_conversions!(Ptr<IUnknown>, VT_UNKNOWN, punkVal, punkVal_mut);
     impl_conversions!(Ptr<IDispatch>, VT_DISPATCH,  pdispVal, pdispVal_mut);
     impl_conversions!(< S : SafeArrayElement> Vec<S>, *mut SAFEARRAY, VT_ARRAY, parray, parray_mut);
-    impl_conversions!(<'s, S: SafeArrayElement> &'s [S], *mut SAFEARRAY, VT_ARRAY, parray, parray_mut);
+    #[allow(single_use_lifetimes)]
+    impl_conversions!(<'s, S: SafeArrayElement>  &'s [S], *mut SAFEARRAY, VT_ARRAY, parray, parray_mut);
     impl_conversions!(Box<VariantBool> => *mut VARIANT_BOOL, VT_PBOOL, pboolVal, pboolVal_mut);
     impl_conversions!(Box<u8>,  VT_PUI1, pbVal,   pbVal_mut);
     impl_conversions!(Box<i16>, VT_PI2,  piVal,   piVal_mut);
@@ -257,36 +255,6 @@ mod private {
     impl_conversions!(Box<Int> => *mut i32, VT_PINT, pintVal, pintVal_mut);
     impl_conversions!(Box<UInt> => *mut u32, VT_PUINT, puintVal, puintVal_mut);
     impl VariantAccess for DecWrapper {
-        const VTYPE: u32 = VT_DECIMAL;
-        type Field = DECIMAL;
-        fn from_var(n1: &VARIANT_n1, _n3: &VARIANT_n3) -> Self::Field {
-            unsafe {*n1.decVal()}
-        }
-        
-        fn into_var(inner: Self::Field, n1: &mut VARIANT_n1, _n3: &mut VARIANT_n3) {
-            unsafe {
-                let n_ptr = n1.decVal_mut();
-                *n_ptr = inner;
-            }
-        }
-    }
-
-    impl<'s> VariantAccess for &'s DecWrapper {
-        const VTYPE: u32 = VT_DECIMAL;
-        type Field = DECIMAL;
-        fn from_var(n1: &VARIANT_n1, _n3: &VARIANT_n3) -> Self::Field {
-            unsafe {*n1.decVal()}
-        }
-        
-        fn into_var(inner: Self::Field, n1: &mut VARIANT_n1, _n3: &mut VARIANT_n3) {
-            unsafe {
-                let n_ptr = n1.decVal_mut();
-                *n_ptr = inner;
-            }
-        }
-    }
-
-    impl<'s> VariantAccess for &'s mut DecWrapper {
         const VTYPE: u32 = VT_DECIMAL;
         type Field = DECIMAL;
         fn from_var(n1: &VARIANT_n1, _n3: &VARIANT_n3) -> Self::Field {

@@ -5,11 +5,11 @@
 #![deny(missing_copy_implementations)]
 #![deny(missing_docs)]
 #![deny(nonstandard_style)]
-//#![deny(single_use_lifetimes)]
-//#![deny(trivial_casts)]
+#![deny(single_use_lifetimes)]
+#![deny(trivial_casts)]
 #![deny(trivial_numeric_casts)]
-//#![deny(unreachable_pub)]
-//#![deny(unused)]
+#![deny(unreachable_pub)]
+#![deny(unused)]
 
 //Turn these warnings into errors
 #![deny(const_err)]
@@ -18,7 +18,7 @@
 #![deny(improper_ctypes)]
 #![deny(overflowing_literals)]
 
-#![doc(html_root_url = "https://docs.rs/oaidl/0.1.4/x86_64-pc-windows-msvc/oaidl/")]
+#![doc(html_root_url = "https://docs.rs/oaidl/0.2.0/x86_64-pc-windows-msvc/oaidl/")]
 //! # Introduction
 //! 
 //! A module to handle conversion to and from common OLE/COM types - VARIANT, SAFEARRAY, and BSTR. 
