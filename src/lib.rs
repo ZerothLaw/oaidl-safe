@@ -118,9 +118,9 @@ mod variant;
 // Types = DroppableBString, Ptr, Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool, 
 //  Variant, VtEmpty, VtNull, 
 // Traits = BStringExt, SafeArrayElement, SafeArrayExt, VariantExt
-pub use self::array::{SafeArrayElement, SafeArrayExt};
+pub use self::array::{SafeArrayPtrElement, SafeArrayElement, SafeArrayExt};
 pub use self::bstr::{BStringExt, DroppableBString};
 pub use self::errors::*;
 pub use self::ptr::Ptr;
 pub use self::types::{Currency, Date, DecWrapper, Int, SCode, TryConvert, UInt, VariantBool};
-pub use self::variant::{Variant, VariantExt, VtEmpty, VtNull};
+pub use self::variant::{CVariantWrapper, Variant, VariantExt, VariantWrapper, VtEmpty, VtNull};
