@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 use std::mem;
-use std::ptr::{drop_in_place, null_mut};
+use std::ptr::{drop_in_place, NonNull, null_mut};
 
 use super::bstr::U16String;
 
@@ -48,7 +48,7 @@ use super::errors::{
     IntoSafeArrElemError,
     SafeArrayError
 };
-use super::ptr::Ptr;
+use super::ptr::{Ptr, PtrDestructor};
 use super::types::{Currency, Date, DecWrapper, Int, SCode, TryConvert, UInt, VariantBool};
 use super::variant::{Variant, Variants, VariantExt, VariantWrapper};
 macro_rules! check_and_throw {
@@ -427,33 +427,12 @@ pub trait SafeArrayExt<T: SafeArrayElement> {
     fn from_safearray(psa: Ptr<SAFEARRAY>) -> Result<Vec<T>, SafeArrayError>;
 }
 
-// Ensures that the SAFEARRAY memory that is allocated gets cleaned up, even during a panic.
-struct SafeArrayDestructor {
-    inner: *mut SAFEARRAY, 
-    _marker: PhantomData<SAFEARRAY>
-}
-
-impl SafeArrayDestructor {
-    fn new(p: *mut SAFEARRAY) -> SafeArrayDestructor {
-        assert!(!p.is_null(), "SafeArrayDestructor initialized with null *mut SAFEARRAY pointer.");
-        SafeArrayDestructor{
-            inner: p, 
-            _marker: PhantomData
-        }
-    }
-}
-
-impl Drop for SafeArrayDestructor {
-    /// calls `SafeArrayDestroy` if the pointer isn't null - only happens if there is a panic or error.
-    /// This is because memory was allocated (ideally) by  
-    fn drop(&mut self)  {
-        if self.inner.is_null(){
-            return;
-        }
+struct SafeArrayDestructor;
+impl PtrDestructor<SAFEARRAY> for SafeArrayDestructor {
+    fn drop(ptr: NonNull<SAFEARRAY>) {
         unsafe {
-            SafeArrayDestroy(self.inner)
+            SafeArrayDestroy(ptr.as_ptr())
         };
-        self.inner = null_mut();
     }
 }
 
@@ -471,10 +450,10 @@ where
         let mut sab = SAFEARRAYBOUND { cElements: c_elements, lLbound: 0i32};
         let psa = unsafe { SafeArrayCreate(vartype as u16, 1, &mut sab)};
         assert!(!psa.is_null());
-        let mut sad = SafeArrayDestructor::new(psa);
+        let psa: Ptr<SAFEARRAY, SafeArrayDestructor> = Ptr::with_checked(psa).unwrap();
         
         for (ix, mut elem) in self.enumerate() {
-            match <Itr::Item as SafeArrayElement>::into_safearray(elem, psa, ix as i32) {
+            match <Itr::Item as SafeArrayElement>::into_safearray(elem, psa.as_ptr(), ix as i32) {
                 Ok(()) => continue,
                 //Safe-ish to do because memory allocated will be freed.  
                 Err(e) => return Err(SafeArrayError::from(IntoSafeArrayError::from_element_err(e, ix)))
@@ -482,20 +461,17 @@ where
         }
 
         // No point in clearing the allocated memory at this point. 
-        sad.inner = null_mut();
-
-        Ok(Ptr::with_checked(psa).unwrap())
+        // This converts Ptr<SAFEARRAY, SAD> to Ptr<SAFEARRAY, DefaultDestructor>
+        Ok(psa.cast())
     }
 
     fn from_safearray(psa: Ptr<SAFEARRAY>) -> Result<Vec<Itr::Item>, SafeArrayError> {
-        let psa = psa.as_ptr();
-        //Stack sentinel to ensure safearray is released even if there is a panic or early return.
-        let _sad = SafeArrayDestructor::new(psa);
-        let sa_dims = unsafe { SafeArrayGetDim(psa) };
+        let psa: Ptr<SAFEARRAY, SafeArrayDestructor> = psa.cast();
+        let sa_dims = unsafe { SafeArrayGetDim(psa.as_ptr()) };
         assert!(sa_dims > 0); //Assert its not a dimensionless safe array
         let vt = unsafe {
             let mut vt: VARTYPE = 0;
-            let hr = SafeArrayGetVartype(psa, &mut vt);
+            let hr = SafeArrayGetVartype(psa.as_ptr(), &mut vt);
             check_and_throw!(hr, {}, {return Err(SafeArrayError::from(FromSafeArrayError::SafeArrayGetVartypeFailed{hr: hr}))});
             vt
         };
@@ -508,16 +484,16 @@ where
             let (l_bound, r_bound) = unsafe {
                 let mut l_bound: c_long = 0;
                 let mut r_bound: c_long = 0;
-                let hr = SafeArrayGetLBound(psa, 1, &mut l_bound);
+                let hr = SafeArrayGetLBound(psa.as_ptr(), 1, &mut l_bound);
                 check_and_throw!(hr, {}, {return Err(SafeArrayError::from(FromSafeArrayError::SafeArrayLBoundFailed{hr: hr}))});
-                let hr = SafeArrayGetUBound(psa, 1, &mut r_bound);
+                let hr = SafeArrayGetUBound(psa.as_ptr(), 1, &mut r_bound);
                 check_and_throw!(hr, {}, {return Err(SafeArrayError::from(FromSafeArrayError::SafeArrayRBoundFailed{hr: hr}))});
                 (l_bound, r_bound)
             };
 
             let mut vc: Vec<Itr::Item> = Vec::new();
             for ix in l_bound..=r_bound {
-                match Itr::Item::from_safearray(psa, ix) {
+                match Itr::Item::from_safearray(psa.as_ptr(), ix) {
                     Ok(val) => { 
                         let v = match Itr::Item::try_convert(val) {
                             Ok(v) => v, 

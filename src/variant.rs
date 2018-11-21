@@ -11,7 +11,7 @@
 
 use std::marker::PhantomData;
 use std::mem;
-use std::ptr::null_mut;
+use std::ptr::{drop_in_place, NonNull};
 
 use winapi::ctypes::c_void;
 use winapi::shared::wtypes::{
@@ -55,7 +55,7 @@ use winapi::um::unknwnbase::IUnknown;
 use super::array::SafeArrayElement;
 use super::bstr::U16String;
 use super::errors::{ElementError,  FromVariantError, IntoVariantError};
-use super::ptr::Ptr;
+use super::ptr::{Ptr, PtrDestructor};
 use super::types::{ Currency, Date, DecWrapper, Int, SCode, TryConvert, UInt, VariantBool };
 
 const VT_PUI1:      u32 = VT_BYREF | VT_UI1;
@@ -440,29 +440,12 @@ where
     }
 }
 
-// Ensures the allocated memory is cleared correctly
-struct VariantDestructor {
-    inner: *mut VARIANT, 
-    _marker: PhantomData<VARIANT>
-}
-
-impl VariantDestructor {
-    fn new(p: *mut VARIANT) -> VariantDestructor {
-        VariantDestructor {
-            inner: p, 
-            _marker: PhantomData
-        }
-    }
-}
-
-impl Drop for VariantDestructor {
-    fn drop(&mut self) {
-        if self.inner.is_null() {
-            return;
-        }
-        unsafe { VariantClear(self.inner)};
-        unsafe { mem::drop(*self.inner);}
-        self.inner = null_mut();
+// Will automatically clean up allocated VARIANT data in memory.
+struct VariantDestructor;
+impl PtrDestructor<VARIANT> for VariantDestructor {
+    fn drop(ptr: NonNull<VARIANT>) {
+        unsafe { VariantClear(ptr.as_ptr())};
+        unsafe { drop_in_place(ptr.as_ptr())};
     }
 }
 
@@ -488,9 +471,8 @@ where
 {
     const VARTYPE: u32 = OutTy::VTYPE;
     fn from_variant(pvar: Ptr<VARIANT>) -> Result<Self, FromVariantError> {
-        let var = pvar.as_ptr();
-        let _var_d = VariantDestructor::new(var);
-        let mut n1 = unsafe {(*var).n1};
+        let pvar: Ptr<VARIANT, VariantDestructor> = pvar.cast();
+        let mut n1 = unsafe {(*pvar.as_ptr()).n1};
         let n3 = unsafe {n1.n2_mut().n3};
         let inner = OutTy::from_var(&n1, &n3);
         Ok(<OutTy as TryConvert<InTy, FromVariantError>>::try_convert(inner)?)

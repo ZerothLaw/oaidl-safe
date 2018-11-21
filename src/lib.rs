@@ -121,6 +121,6 @@ mod variant;
 pub use self::array::{SafeArrayPtrElement, SafeArrayElement, SafeArrayExt};
 pub use self::bstr::{BStringExt, DroppableBString};
 pub use self::errors::*;
-pub use self::ptr::Ptr;
+pub use self::ptr::{DefaultDestructor, DropDestructor, Ptr, PtrDestructor};
 pub use self::types::{Currency, Date, DecWrapper, Int, SCode, TryConvert, UInt, VariantBool};
 pub use self::variant::{CVariantWrapper, Variant, VariantExt, VariantWrapper, VtEmpty, VtNull};

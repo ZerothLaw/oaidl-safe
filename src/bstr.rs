@@ -1,11 +1,11 @@
-use std::ptr::null_mut;
+use std::ptr::{NonNull, null_mut};
 
 use winapi::um::oleauto::{SysAllocStringLen, SysFreeString, SysStringLen};
 use winapi::shared::wtypes::BSTR;
 pub(crate) use widestring::U16String;
 
 use super::errors::{BStringError, ElementError, FromVariantError, IntoSafeArrayError, IntoSafeArrElemError, IntoVariantError, SafeArrayError};
-use super::ptr::Ptr;
+use super::ptr::{Ptr, PtrDestructor};
 use super::types::TryConvert;
 
 /// This trait is implemented on `U16String` to enable the convenient and safe conversion of
@@ -97,11 +97,11 @@ impl BStringExt for U16String {
     }
 
     fn allocate_managed_bstr(&mut self) -> Result<DroppableBString, BStringError> {
-        Ok(DroppableBString{ inner: Some(self.allocate_bstr()?) })
+        Ok(DroppableBString{ inner: Some(self.allocate_bstr()?.cast()) })
     }
 
     fn consume_to_managed_bstr(self) -> Result<DroppableBString, BStringError> {
-        Ok(DroppableBString{ inner: Some(self.consume_to_bstr()?) })
+        Ok(DroppableBString{ inner: Some(self.consume_to_bstr()?.cast()) })
     }
 
     fn deallocate_bstr(bstr: Ptr<u16>) {
@@ -121,6 +121,16 @@ impl BStringExt for U16String {
 
     fn from_boxed_bstr(bstr: Box<u16>) -> U16String {
         U16String::from_bstr(Box::into_raw(bstr))
+    }
+}
+
+#[derive( Debug, Eq, Hash, PartialEq, PartialOrd)]
+struct DropBStr;
+impl PtrDestructor<u16> for DropBStr {
+    fn drop(ptr: NonNull<u16>) {
+        unsafe {
+            SysFreeString(ptr.as_ptr())
+        }
     }
 }
 
@@ -162,7 +172,7 @@ impl BStringExt for U16String {
 /// ```
 #[derive( Debug, Eq, Hash, PartialEq, PartialOrd)]
 pub struct DroppableBString {
-    inner: Option<Ptr<u16>>
+    inner: Option<Ptr<u16, DropBStr>>
 }
 
 impl DroppableBString {
@@ -175,26 +185,14 @@ impl DroppableBString {
     /// This method is very unsafe to use unless you know
     /// how to handle it correctly, hence the `unsafe` marker. 
     pub unsafe fn consume(&mut self) -> *mut u16 {
-        let ret = match self.inner {
-            Some(ptr) => ptr.as_ptr(), 
+        let ret = match self.inner.take() {
+            Some(ptr) => {
+                let ptr: Ptr<u16> = ptr.cast();
+                ptr.as_ptr()
+            }, 
             None => null_mut()
         };
-        self.inner = None;
         ret
-    }
-}
-
-impl Drop for DroppableBString {
-    /// Handles freeing the allocated BSTR correctly via `SysFreeString`. 
-    /// The only (safe) way to construct a [`DroppableBString`] is via 
-    /// an [`allocate_managed_bstr`] call. 
-    fn drop(&mut self) {
-        match self.inner {
-            Some(ptr) => {
-                unsafe { SysFreeString(ptr.as_ptr())}
-            }, 
-            None => {}
-        }
     }
 }
 
