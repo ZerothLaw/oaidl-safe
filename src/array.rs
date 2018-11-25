@@ -44,13 +44,15 @@ use super::errors::{
     ElementError,
     FromSafeArrayError, 
     FromSafeArrElemError, 
+    FromVariantError,
     IntoSafeArrayError, 
     IntoSafeArrElemError,
+    IntoVariantError,
     SafeArrayError
 };
-use super::ptr::{Ptr, PtrDestructor};
+use super::ptr::{Ptr, PtrDestructor, DefaultDestructor};
 use super::types::{Currency, Date, DecWrapper, Int, SCode, TryConvert, UInt, VariantBool};
-use super::variant::{Variant, Variants, VariantExt, VariantWrapper};
+use super::variant::{Variant, VariantDestructor, Variants, VariantExt, VariantWrapper};
 macro_rules! check_and_throw {
     ($hr:ident, $success:expr, $fail:expr) => {
         match $hr {
@@ -189,12 +191,13 @@ pub trait SafeArrayPtrElement: SafeArrayElement {
     fn into_safearray(self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), ElementError>;
 }
 
-impl<Array> SafeArrayPtrElement for Array
+impl<Array, VD> SafeArrayPtrElement for Array
 where 
-    Array: SafeArrayElement<Element=Ptr<VARIANT>>, 
-    Ptr<VARIANT>: TryConvert<Array, ElementError>
+    Array: SafeArrayElement<Element=Ptr<VARIANT, VD>>, 
+    Ptr<VARIANT, VD>: TryConvert<Array, ElementError>, 
+    VD: PtrDestructor<VARIANT>
 {
-    fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Ptr<VARIANT>, ElementError> {
+    fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Ptr<VARIANT, VD>, ElementError> {
         let mut def_val: VARIANT = unsafe {mem::zeroed()};
         let mut empty = EmptyMemoryDestructor::new(&mut def_val);
         #[allow(trivial_casts)]
@@ -211,7 +214,7 @@ where
     }
 
     fn into_safearray(self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), ElementError> {
-        let slf = <Ptr<VARIANT> as TryConvert<Array, ElementError>>::try_convert(self)?;
+        let slf = <Ptr<VARIANT, VD> as TryConvert<Array, ElementError>>::try_convert(self)?;
         let hr = unsafe { SafeArrayPutElement(psa, &ix, slf.as_ptr() as *mut c_void)};
         match hr {
             0 => Ok(()), 
@@ -268,12 +271,14 @@ impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for ['VariantBool']. This all
 /// SafeArrayElement` impl for ['Variant<D,T>']. This allows it to be converted into SAFEARRAY with vt = `VT_VARIANT`.
 /// This overrides the default impl of `from_safearray` and `into_safearray` because `*mut VARIANT` doesn't need 
 /// an additional indirection to be put into a `SAFEARRAY`. 
-impl<D, T> SafeArrayElement for Variant<D, T> 
+impl<D, T, VD> SafeArrayElement for Variant<D, T, VD> 
 where
-    D: VariantExt<T>
+    D: VariantExt<T, VD> + TryConvert<T, FromVariantError> + super::variant::private::VariantAccess<VD, Field=T>, 
+    VD: PtrDestructor<VARIANT>, 
+    T: TryConvert<D, IntoVariantError>
 {
     const SFTYPE: u32 = VT_VARIANT;
-    type Element = Ptr<VARIANT>;
+    type Element = Ptr<VARIANT, VD>;
 
     #[doc(hidden)]
     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self::Element, ElementError> {
@@ -287,10 +292,10 @@ where
 }
 
 
-impl SafeArrayElement for Variants 
+impl SafeArrayElement for Variants
 {
     const SFTYPE: u32 = VT_VARIANT;
-    type Element = Ptr<VARIANT>;
+    type Element = Ptr<VARIANT, DefaultDestructor>;
 
     #[doc(hidden)]
     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self::Element, ElementError> {
@@ -302,10 +307,10 @@ impl SafeArrayElement for Variants
         <Self as SafeArrayPtrElement>::into_safearray(self, psa, ix)
     }
 }
-impl<'var> SafeArrayElement for &'var dyn VariantWrapper 
+impl SafeArrayElement for Box<VariantWrapper> 
 {
     const SFTYPE: u32 = VT_VARIANT;
-    type Element = Ptr<VARIANT>;
+    type Element = Ptr<VARIANT, VariantDestructor>;
 
     #[doc(hidden)]
     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self::Element, ElementError> {
@@ -317,6 +322,21 @@ impl<'var> SafeArrayElement for &'var dyn VariantWrapper
         <Self as SafeArrayPtrElement>::into_safearray(self, psa, ix)
     }
 }
+// impl<'var> SafeArrayElement for &'var dyn CVariantWrapper 
+// {
+//     const SFTYPE: u32 = VT_VARIANT;
+//     type Element = Ptr<VARIANT>;
+
+//     #[doc(hidden)]
+//     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self::Element, ElementError> {
+//         <Self as SafeArrayPtrElement>::from_safearray(psa,ix)
+//     }
+
+//     #[doc(hidden)]
+//     fn into_safearray(self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), ElementError> {
+//         <Self as SafeArrayPtrElement>::into_safearray(self, psa, ix)
+//     }
+// }
 impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for ['DecWrapper']. This allows it to be converted into SAFEARRAY with vt = `VT_DECIMAL`."]DecWrapper => DECIMAL, VT_DECIMAL);
 //VT_RECORD
 impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for `i8`. This allows it to be converted into SAFEARRAY with vt = `VT_I1`."]i8, VT_I1);
@@ -427,7 +447,9 @@ pub trait SafeArrayExt<T: SafeArrayElement> {
     fn from_safearray(psa: Ptr<SAFEARRAY>) -> Result<Vec<T>, SafeArrayError>;
 }
 
-struct SafeArrayDestructor;
+/// 
+#[derive(Copy, Clone, Debug)]
+pub struct SafeArrayDestructor;
 impl PtrDestructor<SAFEARRAY> for SafeArrayDestructor {
     fn drop(ptr: NonNull<SAFEARRAY>) {
         unsafe {

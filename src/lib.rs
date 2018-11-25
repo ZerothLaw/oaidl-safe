@@ -96,6 +96,7 @@
 //! [`SafeArrayElement`]: trait.SafeArrayElement.html
 //! [`SafeArrayExt`]: trait.SafeArrayExt.html
 //! [`VariantExt`]: trait.VariantExt.html
+
 #[macro_use] extern crate failure;
 
 extern crate rust_decimal;
@@ -118,9 +119,9 @@ mod variant;
 // Types = DroppableBString, Ptr, Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool, 
 //  Variant, VtEmpty, VtNull, 
 // Traits = BStringExt, SafeArrayElement, SafeArrayExt, VariantExt
-pub use self::array::{SafeArrayPtrElement, SafeArrayElement, SafeArrayExt};
+pub use self::array::{SafeArrayDestructor,  SafeArrayElement, SafeArrayExt, SafeArrayPtrElement};
 pub use self::bstr::{BStringExt, DroppableBString};
 pub use self::errors::*;
 pub use self::ptr::{DefaultDestructor, DropDestructor, Ptr, PtrDestructor};
 pub use self::types::{Currency, Date, DecWrapper, Int, SCode, TryConvert, UInt, VariantBool};
-pub use self::variant::{CVariantWrapper, Variant, VariantExt, VariantWrapper, VtEmpty, VtNull};
+pub use self::variant::{Variant, VariantDestructor, VariantExt, VariantWrapper, Variants, VtEmpty, VtNull};

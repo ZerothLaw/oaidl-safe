@@ -8,6 +8,9 @@ pub enum ElementError {
     /// Holds IntoSafeArrElemErrors in a box
     #[fail(display = "{}", _0)]
     Into(Box<IntoSafeArrElemError>), 
+    /// VariantWrapper
+    #[fail(display = "")]
+    PtrVariantCannotBecomeTraitObject,
 }
 
 impl From<FromSafeArrElemError> for ElementError {
@@ -239,6 +242,9 @@ pub enum FromVariantError {
     /// `VARIANT` pointer during conversion was null
     #[fail(display = "VARIANT pointer is null")]
     VariantPtrNull,
+    /// 
+    #[fail(display = "")]
+    VariantsConversionError,
 }
 
 /// Encapsulates errors that can occur during conversion into VARIANT
@@ -250,6 +256,9 @@ pub enum IntoVariantError {
     /// Encapsulates a `SafeArrayError`
     #[fail(display = "SafeArray conversion failed: {}", _0)]
     SafeArrConvFailed(Box<SafeArrayError>),
+    ///
+    #[fail(display = "Can't convert &dyn CVariantWrappers into Ptr<VARIANTS>")]
+    CVarWrapper,
 }
 
 impl From<BStringError> for IntoVariantError {

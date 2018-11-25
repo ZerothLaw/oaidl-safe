@@ -80,14 +80,17 @@ const VT_PUI4:      u32 = VT_BYREF | VT_UI4;
 const VT_PINT:      u32 = VT_BYREF | VT_INT;
 const VT_PUINT:     u32 = VT_BYREF | VT_UINT;
 
-mod private {
+pub(crate) mod private {
     use super::*;
 
     #[doc(hidden)]
     pub(crate) trait Sealed {}
 
     #[doc(hidden)]
-    pub trait VariantAccess: Sized {
+    pub trait VariantAccess<VD=VariantDestructor>: Sized
+    where
+        VD: PtrDestructor<VARIANT> 
+    {
         #[doc(hidden)]
         const VTYPE: u32;
 
@@ -103,7 +106,10 @@ mod private {
 
     macro_rules! impl_conversions {
         (@impl <$($life:lifetime)*> $t:ty, $f:ty, $vtype:ident, $member:ident, $member_mut:ident) => {
-            impl $(<$life>)* VariantAccess for $t {
+            impl<VD> $(<$life>)* VariantAccess<VD> for $t 
+            where 
+                VD: PtrDestructor<VARIANT>
+            {
                 const VTYPE: u32 = $vtype;
                 type Field = $f;
                 fn from_var(_n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field {
@@ -112,16 +118,16 @@ mod private {
                 
                 fn into_var(inner: Self::Field, _n1: &mut VARIANT_n1, n3: &mut VARIANT_n3) {
                     unsafe {
-                        let n_ptr = n3.$member_mut();
-                        *n_ptr = inner;
+                        *(n3.$member_mut()) = inner;
                     }
                 }
             }
         };
         ( < $($tl:lifetime,)* $tn:ident : $tb:ident > $t:ty, $field:ty, $vtype:ident, $member:ident, $member_mut:ident ) => {
-            impl<$($tl,)* $tn> VariantAccess for $(&$tl)* $t 
+            impl<$($tl,)* VD, $tn> VariantAccess<VD> for $(&$tl)* $t 
             where
-                $tn: $tb
+                $tn: $tb, 
+                VD: PtrDestructor<VARIANT>
             {
                 const VTYPE: u32 = $vtype;
                 type Field = $field;
@@ -139,7 +145,10 @@ mod private {
             }
         };
         (Ptr<$field:ty>, $vtype:ident, $member:ident, $member_mut:ident) => {
-            impl VariantAccess for Ptr<$field>{
+            impl<VD> VariantAccess<VD> for Ptr<$field>
+            where
+                VD: PtrDestructor<VARIANT>
+            {
                 const VTYPE: u32 = $vtype;
                 type Field = Ptr<$field>;
 
@@ -223,12 +232,14 @@ mod private {
     impl_conversions!(Box<Ptr<IDispatch>> => *mut *mut IDispatch, VT_PDISPATCH, ppdispVal, ppdispVal_mut);
     impl_conversions!(< S : SafeArrayElement> Box<Vec<S>>, *mut *mut SAFEARRAY, VT_PARRAY, pparray, pparray_mut);
     impl_conversions!(<'s, S: SafeArrayElement> Box<&'s [S]>, *mut *mut SAFEARRAY, VT_PARRAY, pparray, pparray_mut);
-    impl<D, T> VariantAccess for Variant<D, T>
+    impl<D, T, VD> VariantAccess<VD> for Variant<D, T>
     where
-        D: VariantExt<T>
+        D: VariantExt<T, VD> + TryConvert<T, FromVariantError> + self::private::VariantAccess<Field=T>,
+        VD: PtrDestructor<VARIANT>, 
+        T: TryConvert<D, IntoVariantError>
     {
         const VTYPE: u32 = VT_VARIANT;
-        type Field = Ptr<VARIANT>;
+        type Field = Ptr<VARIANT, VD>;
         fn from_var(_n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field {
             unsafe {Ptr::with_checked(*n3.pvarVal()).unwrap()}
         }
@@ -240,9 +251,12 @@ mod private {
             }
         }
     }
-    impl VariantAccess for Variants {
+    impl<VD> VariantAccess<VD> for Variants 
+    where
+        VD: PtrDestructor<VARIANT>
+    {
         const VTYPE: u32 = VT_VARIANT;
-        type Field = Ptr<VARIANT>;
+        type Field = Ptr<VARIANT, VD>;
         fn from_var(_n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field {
             unsafe {Ptr::with_checked(*n3.pvarVal()).unwrap()}
         }
@@ -255,9 +269,12 @@ mod private {
         }
     }
     #[allow(single_use_lifetimes)]
-    impl<'var> VariantAccess for &'var Variants {
+    impl<'var, VD> VariantAccess<VD> for &'var Variants 
+    where
+        VD: PtrDestructor<VARIANT>
+    {
         const VTYPE: u32 = VT_VARIANT;
-        type Field = Ptr<VARIANT>;
+        type Field = Ptr<VARIANT, VD>;
         fn from_var(_n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field {
             unsafe {Ptr::with_checked(*n3.pvarVal()).unwrap()}
         }
@@ -270,9 +287,12 @@ mod private {
         }
     }
     #[allow(single_use_lifetimes)]
-    impl<'var> VariantAccess for &'var mut Variants {
+    impl<'var, VD> VariantAccess<VD> for &'var mut Variants 
+    where
+        VD: PtrDestructor<VARIANT>
+    {
         const VTYPE: u32 = VT_VARIANT;
-        type Field = Ptr<VARIANT>;
+        type Field = Ptr<VARIANT, VD>;
         fn from_var(_n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field {
             unsafe {Ptr::with_checked(*n3.pvarVal()).unwrap()}
         }
@@ -284,9 +304,12 @@ mod private {
             }
         }
     }
-    impl<'dyn> VariantAccess for &'dyn dyn VariantWrapper {
+    impl<VD> VariantAccess<VD> for Box<VariantWrapper> 
+    where
+        VD: PtrDestructor<VARIANT>
+    {
         const VTYPE: u32 = VT_VARIANT;
-        type Field = Ptr<VARIANT>;
+        type Field = Ptr<VARIANT, VD>;
         fn from_var(_n1: &VARIANT_n1, n3: &VARIANT_n3) -> Self::Field {
             unsafe {Ptr::with_checked(*n3.pvarVal()).unwrap()}
         }
@@ -298,6 +321,7 @@ mod private {
             }
         }
     }
+
     impl_conversions!(Ptr<c_void>, VT_BYREF, byref, byref_mut); 
     impl_conversions!(i8, VT_I1, cVal, cVal_mut);
     impl_conversions!(u16, VT_UI2, uiVal, uiVal_mut);
@@ -312,7 +336,10 @@ mod private {
     impl_conversions!(Box<u64>, VT_PUI8, pullVal, pullVal_mut);
     impl_conversions!(Box<Int> => *mut i32, VT_PINT, pintVal, pintVal_mut);
     impl_conversions!(Box<UInt> => *mut u32, VT_PUINT, puintVal, puintVal_mut);
-    impl VariantAccess for DecWrapper {
+    impl<VD> VariantAccess<VD> for DecWrapper 
+    where  
+        VD: PtrDestructor<VARIANT>
+    {
         const VTYPE: u32 = VT_DECIMAL;
         type Field = DECIMAL;
         fn from_var(n1: &VARIANT_n1, _n3: &VARIANT_n3) -> Self::Field {
@@ -327,7 +354,10 @@ mod private {
         }
     }
 
-    impl VariantAccess for VtEmpty {
+    impl<VD> VariantAccess<VD> for VtEmpty 
+    where  
+        VD: PtrDestructor<VARIANT>
+    {
         const VTYPE: u32 = VT_EMPTY;
         type Field = ();
         fn from_var(_n1: &VARIANT_n1, _n3: &VARIANT_n3) -> Self::Field {
@@ -337,7 +367,10 @@ mod private {
         {}
     }
 
-    impl VariantAccess for VtNull {
+    impl<VD> VariantAccess<VD> for VtNull 
+    where  
+        VD: PtrDestructor<VARIANT>
+    {
         const VTYPE: u32 = VT_NULL;
         type Field = ();
         fn from_var(_n1: &VARIANT_n1, _n3: &VARIANT_n3) -> Self::Field {
@@ -357,34 +390,39 @@ mod private {
 /// ```
 /// extern crate oaidl;
 /// 
-/// use oaidl::{ConversionError, Variant, VariantExt};
+/// use oaidl::{ConversionError, Variant, VariantDestructor, VariantExt};
 /// 
 /// fn main() -> Result<(), ConversionError> {
 ///     let val = 1337u16;
-///     let val = Variant::wrap(val);
+///     let val = Variant::<u16, u16, VariantDestructor>::wrap(val);
 ///     // convert into a Ptr<VARIANT> as per usual. 
 ///     Ok(())
 /// }
 /// ```
 /// 
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Variant<D, T> 
+pub struct Variant<D, T, VD=VariantDestructor> 
 where 
-    D: VariantExt<T>
+    D: VariantExt<T, VD>, 
+    VD: PtrDestructor<VARIANT>
 {
     inner: D, 
-    _marker: PhantomData<T>
+    _marker: PhantomData<T>, 
+    _destroy: PhantomData<VD>
 }
 
-impl<D, T> Variant<D, T> 
+impl<D, T, VD> Variant<D, T, VD> 
 where
-    D: VariantExt<T> 
+    D: VariantExt<T, VD> + TryConvert<T, FromVariantError> + self::private::VariantAccess<VD, Field=T>,
+    VD: PtrDestructor<VARIANT>, 
+    T: TryConvert<D, IntoVariantError>
 {
     /// Associated method to wrap a VariantExt compatible type `D` into a Variant
     pub fn wrap(d: D) -> Self {
         Variant{
             inner: d, 
-            _marker: PhantomData
+            _marker: PhantomData, 
+            _destroy: PhantomData
         }
     }
 
@@ -394,54 +432,63 @@ where
     }
 }
 
-impl<D, T> TryConvert<Ptr<VARIANT>, FromVariantError> for Variant<D, T> 
+impl<D, T, VD> TryConvert<Ptr<VARIANT, VD>, FromVariantError> for Variant<D, T, VD> 
 where
-    D: VariantExt<T>
+    D: VariantExt<T, VD> + TryConvert<T, FromVariantError> + self::private::VariantAccess<VD, Field=T>,
+    VD: PtrDestructor<VARIANT>, 
+    T: TryConvert<D, IntoVariantError>
 {
     /// Converts a [`Ptr<VARIANT>`] to a [`Variant<D, T>`] where D: [`VariantExt<T>`]
-    fn try_convert(ptr: Ptr<VARIANT>) -> Result<Self, FromVariantError> {
-        Ok(Variant::wrap(VariantExt::<T>::from_variant(ptr)?))
+    fn try_convert(ptr: Ptr<VARIANT, VD>) -> Result<Self, FromVariantError> {
+        Ok(Variant::wrap(VariantExt::<T, VD>::from_variant(ptr)?))
     }
 }
 
-impl<D, T> TryConvert<Variant<D, T>, IntoVariantError> for Ptr<VARIANT> 
+impl<D, T, VD> TryConvert<Variant<D, T, VD>, IntoVariantError> for Ptr<VARIANT, VD> 
 where
-    D: VariantExt<T>
+    D: VariantExt<T, VD> + TryConvert<T, FromVariantError> + self::private::VariantAccess<VD, Field=T>,
+    VD: PtrDestructor<VARIANT>, 
+    T: TryConvert<D, IntoVariantError>
 {
     /// Converts a  [`Variant<D, T>`] to a [`Ptr<VARIANT>`] where D: [`VariantExt<T>`]
     /// This converts the value *inside* Variant into a Ptr<VARIANT> which is then stuffed
     /// inside a containing variant by the caller of the method.
-    fn try_convert(v: Variant<D, T>) -> Result<Self, IntoVariantError> {
+    fn try_convert(v: Variant<D, T, VD>) -> Result<Self, IntoVariantError> {
         let v = v.unwrap();
-        Ok(VariantExt::<T>::into_variant(v)?)
+        Ok(VariantExt::<T, VD>::into_variant(v)?)
     }
 }
 
-impl<D, T> TryConvert<Variant<D, T>, ElementError> for Ptr<VARIANT> 
+impl<D, T, VD> TryConvert<Variant<D, T, VD>, ElementError> for Ptr<VARIANT, VD> 
 where
-    D: VariantExt<T>
+    D: VariantExt<T, VD> + TryConvert<T, FromVariantError> + self::private::VariantAccess<VD, Field=T>,
+    VD: PtrDestructor<VARIANT>, 
+    T: TryConvert<D, IntoVariantError>
 {
     /// Converts a  [`Variant<D, T>`] to a [`Ptr<VARIANT>`] where D: [`VariantExt<T>`]
     /// This converts the value *inside* Variant into a Ptr<VARIANT> which is then stuffed
     /// inside a containing variant by the caller of the method.
-    fn try_convert(v: Variant<D, T>) -> Result<Self, ElementError> {
+    fn try_convert(v: Variant<D, T, VD>) -> Result<Self, ElementError> {
         let v = v.unwrap();
-        Ok(VariantExt::<T>::into_variant(v)?)
+        Ok(VariantExt::<T, VD>::into_variant(v)?)
     }
 }
 
-impl<D, T> TryConvert<Ptr<VARIANT> , ElementError> for Variant<D, T> 
+impl<D, T, VD> TryConvert<Ptr<VARIANT, VD> , ElementError> for Variant<D, T, VD> 
 where
-    D: VariantExt<T>
+    D: VariantExt<T, VD> + TryConvert<T, FromVariantError> + self::private::VariantAccess<VD, Field=T>,
+    VD: PtrDestructor<VARIANT>, 
+    T: TryConvert<D, IntoVariantError>
 {
     /// Converts a [`Ptr<VARIANT>`] to a [`Variant<D, T>`] where D: [`VariantExt<T>`]
-    fn try_convert(ptr: Ptr<VARIANT> ) -> Result<Self, ElementError> {
-        Ok(Variant::wrap(VariantExt::<T>::from_variant(ptr)?))
+    fn try_convert(ptr: Ptr<VARIANT, VD> ) -> Result<Self, ElementError> {
+        Ok(Variant::wrap(VariantExt::<T, VD>::from_variant(ptr)?))
     }
 }
 
-// Will automatically clean up allocated VARIANT data in memory.
-struct VariantDestructor;
+/// Automatically cleans up allocated VARIANT data in memory.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct VariantDestructor;
 impl PtrDestructor<VARIANT> for VariantDestructor {
     fn drop(ptr: NonNull<VARIANT>) {
         unsafe { VariantClear(ptr.as_ptr())};
@@ -451,34 +498,38 @@ impl PtrDestructor<VARIANT> for VariantDestructor {
 
 /// Trait implemented to convert the type into a VARIANT.
 /// Do not implement this yourself without care. 
-pub trait VariantExt<B>: Sized { 
+pub trait VariantExt<B, VD=VariantDestructor>: Sized 
+where
+    VD: PtrDestructor<VARIANT>
+{ 
     /// VARTYPE constant value for the type
     const VARTYPE: u32;
 
     /// Call this associated function on a [`Ptr<VARIANT>`] to obtain a value `T`
-    fn from_variant(var: Ptr<VARIANT>) -> Result<Self, FromVariantError>;  
+    fn from_variant(var: Ptr<VARIANT, VD>) -> Result<Self, FromVariantError>;  
 
     /// Convert a value of type `T` into a [`Ptr<VARIANT>`]
-    fn into_variant(value: Self) -> Result<Ptr<VARIANT>, IntoVariantError>;
+    fn into_variant(value: Self) -> Result<Ptr<VARIANT, VD>, IntoVariantError>;
 }
 
 /// Blanket implementation where TryConvert implementations exist between OutTy<==>InTy 
 /// and a private trait is implemented on OutTy. 
-impl<OutTy, InTy> VariantExt<InTy> for OutTy
+impl<OutTy, InTy, VD> VariantExt<InTy, VD> for OutTy
 where
-    OutTy: TryConvert<InTy, FromVariantError> + self::private::VariantAccess<Field=InTy>,
-    InTy: TryConvert<OutTy, IntoVariantError>
+    OutTy: TryConvert<InTy, FromVariantError> + self::private::VariantAccess<VD, Field=InTy>,
+    InTy: TryConvert<OutTy, IntoVariantError>, 
+    VD: PtrDestructor<VARIANT>
 {
     const VARTYPE: u32 = OutTy::VTYPE;
-    fn from_variant(pvar: Ptr<VARIANT>) -> Result<Self, FromVariantError> {
-        let pvar: Ptr<VARIANT, VariantDestructor> = pvar.cast();
+    fn from_variant(pvar: Ptr<VARIANT, VD>) -> Result<Self, FromVariantError> {
+        let pvar = pvar.cast::<VARIANT, VariantDestructor>();
         let mut n1 = unsafe {(*pvar.as_ptr()).n1};
         let n3 = unsafe {n1.n2_mut().n3};
         let inner = OutTy::from_var(&n1, &n3);
         Ok(<OutTy as TryConvert<InTy, FromVariantError>>::try_convert(inner)?)
     }
 
-    fn into_variant(value: OutTy) -> Result<Ptr<VARIANT>, IntoVariantError> {
+    fn into_variant(value: OutTy) -> Result<Ptr<VARIANT, VD>, IntoVariantError> {
         let mut n3: VARIANT_n3 = unsafe {mem::zeroed()};
         let mut n1: VARIANT_n1 = unsafe {mem::zeroed()};
         OutTy::into_var(InTy::try_convert(value)?, &mut n1, &mut n3);
@@ -534,22 +585,39 @@ impl TryConvert<VtNull, IntoVariantError> for () {
 /// Convenience Enum 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Variants {
+    /// VT_I8 - 8 byte signed int
     LongLong(i64),
+    /// VT_I4 - 4 byte signed int
     Long(i32), 
+    /// VT_UI1 - 1 byte unsigned int
     Char(u8), 
+    /// VT_UI2 - 2 byte unsigned int
     Short(i16), 
+    /// VT_R4 - 4 byte floating point
     Float(f32), 
+    /// VT_R8 - 8 byte floating point
     Double(f64),
-    Bool(bool), 
+    /// boolean
+    Bool(bool),
+    /// SCode - error code 
     Error(SCode), 
-    Cy(Currency), 
+    /// Currency
+    Cy(Currency),
+    /// Date rep 
     Date(Date), 
-    String(String), 
+    /// String
+    String(String),
+    /// VT_I1 - 1 byte signed int 
     Byte(i8),
+    /// VT_UI2 - 2 byte unsigned int
     UShort(u16), 
+    /// VT_UI4 - 4 byte unsigned int
     ULong(u32), 
+    /// VT_UI8 - 8 byte unsigned int
     ULongLong(u64), 
+    /// VT_INT - signed integer
     Int(Int), 
+    /// VT_UINT - unsigned integer
     UInt(UInt)
 }
 
@@ -585,134 +653,141 @@ impl_from_for_var!{
     UInt, UInt
 }
 
-impl TryConvert<Ptr<VARIANT>, FromVariantError> for Variants {
-    fn try_convert(ptr: Ptr<VARIANT>) -> Result<Self, FromVariantError> {
-        let vptr = ptr.as_ptr();
+impl<D> TryConvert<Ptr<VARIANT, D>, FromVariantError> for Variants 
+where
+    D: PtrDestructor<VARIANT>
+{
+    fn try_convert(ptr: Ptr<VARIANT, D>) -> Result<Self, FromVariantError> {
         let vt = unsafe {
-            (*vptr).n1.n2().vt
+            (*ptr.as_ptr()).n1.n2().vt
         };
 
         match vt as u32 {
-            VT_I8 => Ok(Variants::LongLong(VariantExt::<_>::from_variant(ptr)?)),
-            VT_I4 => Ok(Variants::Long(VariantExt::<_>::from_variant(ptr)?)), 
-            VT_UI1 => Ok(Variants::Char(VariantExt::<_>::from_variant(ptr)?)), 
-            VT_I2 => Ok(Variants::Short(VariantExt::<_>::from_variant(ptr)?)), 
-            VT_R4 => Ok(Variants::Float(VariantExt::<_>::from_variant(ptr)?)), 
-            VT_R8 => Ok(Variants::Double(VariantExt::<_>::from_variant(ptr)?)),
+            VT_I8 => Ok(Variants::LongLong(VariantExt::<_, D>::from_variant(ptr)?)),
+            VT_I4 => Ok(Variants::Long(VariantExt::<_, D>::from_variant(ptr)?)), 
+            VT_UI1 => Ok(Variants::Char(VariantExt::<_, D>::from_variant(ptr)?)), 
+            VT_I2 => Ok(Variants::Short(VariantExt::<_, D>::from_variant(ptr)?)), 
+            VT_R4 => Ok(Variants::Float(VariantExt::<_, D>::from_variant(ptr)?)), 
+            VT_R8 => Ok(Variants::Double(VariantExt::<_, D>::from_variant(ptr)?)),
             VT_BOOL => {
-                let vb: VariantBool = VariantExt::<_>::from_variant(ptr)?;
+                let vb: VariantBool = VariantExt::<_, D>::from_variant(ptr)?;
                 Ok(Variants::Bool(bool::from(vb)))
             }, 
-            VT_ERROR => Ok(Variants::Error(VariantExt::<_>::from_variant(ptr)?)), 
-            VT_CY => Ok(Variants::Cy(VariantExt::<_>::from_variant(ptr)?)), 
-            VT_DATE => Ok(Variants::Date(VariantExt::<_>::from_variant(ptr)?)),
+            VT_ERROR => Ok(Variants::Error(VariantExt::<_, D>::from_variant(ptr)?)), 
+            VT_CY => Ok(Variants::Cy(VariantExt::<_, D>::from_variant(ptr)?)), 
+            VT_DATE => Ok(Variants::Date(VariantExt::<_, D>::from_variant(ptr)?)),
             VT_BSTR => {
-               let u: U16String = VariantExt::<_>::from_variant(ptr)?;
+               let u: U16String = VariantExt::<_, D>::from_variant(ptr)?;
                Ok(Variants::String(u.to_string_lossy())) 
             },   
-            VT_I1 => Ok(Variants::Byte(VariantExt::<_>::from_variant(ptr)?)), 
-            VT_UI2 => Ok(Variants::UShort(VariantExt::<_>::from_variant(ptr)?)),
-            VT_UI4 => Ok(Variants::ULong(VariantExt::<_>::from_variant(ptr)?)),
-            VT_UI8 => Ok(Variants::ULongLong(VariantExt::<_>::from_variant(ptr)?)),  
-            VT_INT => Ok(Variants::Int(VariantExt::<_>::from_variant(ptr)?)), 
-            VT_UINT => Ok(Variants::UInt(VariantExt::<_>::from_variant(ptr)?)),
+            VT_I1 => Ok(Variants::Byte(VariantExt::<_, D>::from_variant(ptr)?)), 
+            VT_UI2 => Ok(Variants::UShort(VariantExt::<_, D>::from_variant(ptr)?)),
+            VT_UI4 => Ok(Variants::ULong(VariantExt::<_, D>::from_variant(ptr)?)),
+            VT_UI8 => Ok(Variants::ULongLong(VariantExt::<_, D>::from_variant(ptr)?)),  
+            VT_INT => Ok(Variants::Int(VariantExt::<_, D>::from_variant(ptr)?)), 
+            VT_UINT => Ok(Variants::UInt(VariantExt::<_, D>::from_variant(ptr)?)),
             _ => panic!()
         }
     }
 } 
 
-impl TryConvert<Variants, IntoVariantError> for Ptr<VARIANT> {
+impl<D> TryConvert<Variants, IntoVariantError> for Ptr<VARIANT, D>
+where
+    D: PtrDestructor<VARIANT>
+{
     fn try_convert(var: Variants) -> Result<Self, IntoVariantError> {
         use self::Variants::*;
         match var {
-            LongLong(i) => VariantExt::<_>::into_variant(i),
-            Long(i) => VariantExt::<_>::into_variant(i),
-            Char(i) => VariantExt::<_>::into_variant(i),
-            Short(i) => VariantExt::<_>::into_variant(i),
-            Float(i) => VariantExt::<_>::into_variant(i),
-            Double(i) => VariantExt::<_>::into_variant(i),
+            LongLong(i) => VariantExt::<_, D>::into_variant(i),
+            Long(i) => VariantExt::<_, D>::into_variant(i),
+            Char(i) => VariantExt::<_, D>::into_variant(i),
+            Short(i) => VariantExt::<_, D>::into_variant(i),
+            Float(i) => VariantExt::<_, D>::into_variant(i),
+            Double(i) => VariantExt::<_, D>::into_variant(i),
             Bool(i) => {
                 let vb = VariantBool::from(i);
-                VariantExt::<_>::into_variant(vb)
+                VariantExt::<_, D>::into_variant(vb)
             },
-            Error(i) => VariantExt::<_>::into_variant(i),
-            Cy(i) => VariantExt::<_>::into_variant(i),
-            Date(i) => VariantExt::<_>::into_variant(i),
+            Error(i) => VariantExt::<_, D>::into_variant(i),
+            Cy(i) => VariantExt::<_, D>::into_variant(i),
+            Date(i) => VariantExt::<_, D>::into_variant(i),
             String(i) => {
                 let u = U16String::from_str(&i);
-                VariantExt::<_>::into_variant(u)
+                VariantExt::<_, D>::into_variant(u)
             }, 
-            Byte(i) => VariantExt::<_>::into_variant(i),
-            UShort(i) => VariantExt::<_>::into_variant(i),
-            ULong(i) => VariantExt::<_>::into_variant(i),
-            ULongLong(i) => VariantExt::<_>::into_variant(i),
-            Int(i) => VariantExt::<_>::into_variant(i),
-            UInt(i) => VariantExt::<_>::into_variant(i),
+            Byte(i) => VariantExt::<_, D>::into_variant(i),
+            UShort(i) => VariantExt::<_, D>::into_variant(i),
+            ULong(i) => VariantExt::<_, D>::into_variant(i),
+            ULongLong(i) => VariantExt::<_, D>::into_variant(i),
+            Int(i) => VariantExt::<_, D>::into_variant(i),
+            UInt(i) => VariantExt::<_, D>::into_variant(i),
         }
     }
 }
 
-
-impl<'t> TryConvert<&'t Variants, IntoVariantError> for Ptr<VARIANT> {
+impl<'t, D> TryConvert<&'t Variants, IntoVariantError> for Ptr<VARIANT, D> 
+where
+    D: PtrDestructor<VARIANT>
+{
     fn try_convert(var: &'t Variants) -> Result<Self, IntoVariantError> {
-        <Ptr<VARIANT> as TryConvert<Variants, IntoVariantError>>::try_convert(var.clone())
+        <Ptr<VARIANT, D> as TryConvert<Variants, IntoVariantError>>::try_convert(var.clone())
     }
 }
 
 
-impl TryConvert<Ptr<VARIANT>, ElementError> for Variants {
-    fn try_convert(ptr: Ptr<VARIANT>) -> Result<Self, ElementError> {
-        Ok(<Self as TryConvert<Ptr<VARIANT>, FromVariantError>>::try_convert(ptr)?)
+impl<D> TryConvert<Ptr<VARIANT, D>, ElementError> for Variants 
+where
+    D: PtrDestructor<VARIANT>
+{
+    fn try_convert(ptr: Ptr<VARIANT, D>) -> Result<Self, ElementError> {
+        Ok(<Self as TryConvert<Ptr<VARIANT, D>, FromVariantError>>::try_convert(ptr)?)
     }
 }
 
-impl TryConvert<Variants, ElementError> for Ptr<VARIANT> {
+impl<D> TryConvert<Variants, ElementError> for Ptr<VARIANT, D> 
+where 
+    D: PtrDestructor<VARIANT>
+{
     fn try_convert(var: Variants) -> Result<Self, ElementError> {
         Ok(<Self as TryConvert<Variants, IntoVariantError>>::try_convert(var)?)
     }
 }
 
+impl<D> TryConvert<Box<VariantWrapper<D>>, ElementError> for Ptr<VARIANT, D>
+where 
+    D: PtrDestructor<VARIANT>
+{
+    fn try_convert(vw: Box<VariantWrapper<D>>) -> Result<Ptr<VARIANT, D>, ElementError> {
+        Ok(vw.into_var()?)
+    }
+}
+
+impl<D> TryConvert<Ptr<VARIANT, D>, ElementError> for Box<VariantWrapper<D>> 
+where
+    D: PtrDestructor<VARIANT>
+{
+    fn try_convert(ptr: Ptr<VARIANT, D>) -> Result<Self, ElementError> {
+        Ok(Box::new(<Variants as TryConvert<Ptr<VARIANT, D>, FromVariantError>>::try_convert(ptr)?))
+    }
+}
+
 ///
-pub trait VariantWrapper {
+pub trait VariantWrapper<D=VariantDestructor> 
+where 
+    D: PtrDestructor<VARIANT>
+{
     ///
-    fn into_var(&self) -> Result<Ptr<VARIANT>, IntoVariantError>;
-}
-///
-pub trait CVariantWrapper{
-    ///
-    fn from_var(&self) -> Result<Variants, FromVariantError>;
+    fn into_var(&self) -> Result<Ptr<VARIANT, D>, IntoVariantError>;
 }
 
-impl VariantWrapper for Variants {
-    fn into_var(&self) -> Result<Ptr<VARIANT>, IntoVariantError> {
-        Variants::into_variant(self.clone())
+impl<D> VariantWrapper<D> for Variants 
+where 
+    D: PtrDestructor<VARIANT>
+{
+    fn into_var(&self) -> Result<Ptr<VARIANT, D>, IntoVariantError> {
+        <Ptr<VARIANT, D> as TryConvert<Variants, IntoVariantError>>::try_convert(self.clone())
     }
 }
-
-impl CVariantWrapper for Ptr<VARIANT> {
-    fn from_var(&self) -> Result<Variants, FromVariantError> {
-        Variants::from_variant(self.clone())
-    }
-}
-
-impl<'dyn> TryConvert<&'dyn dyn VariantWrapper, IntoVariantError> for Ptr<VARIANT> {
-    fn try_convert(v: &'dyn dyn VariantWrapper) -> Result<Self, IntoVariantError> {
-        Ok(v.into_var()?)
-    }
-}
-
-impl<'dyn> TryConvert<&'dyn dyn VariantWrapper, ElementError> for Ptr<VARIANT> {
-    fn try_convert(v: &'dyn dyn VariantWrapper) -> Result<Self, ElementError> {
-        Ok(v.into_var()?)
-    }
-}
-
-impl<'dyn> TryConvert<&'dyn dyn CVariantWrapper, FromVariantError> for Variants {
-    fn try_convert(v: &'dyn dyn CVariantWrapper) -> Result<Variants, FromVariantError> {
-        Ok(v.from_var()?)
-    }
-}
-
 
 #[cfg(test)]
 mod test {
@@ -722,7 +797,7 @@ mod test {
     macro_rules! validate_variant {
         (@impl $t:ty, $val:expr, $vt:expr) => {
             let v = $val;
-            let var: Ptr<VARIANT> = VariantExt::<_>::into_variant(v.clone()).unwrap();
+            let var: Ptr<VARIANT, VariantDestructor> = VariantExt::<_, VariantDestructor>::into_variant(v.clone()).unwrap();
             assert!(!var.as_ptr().is_null());
             unsafe {
                 let pvar = var.as_ptr();
@@ -730,7 +805,7 @@ mod test {
                 let tv: &__tagVARIANT = n1.n2();
                 assert_eq!(tv.vt as u32, $vt);
             };
-            let var: $t = VariantExt::<_>::from_variant(var).unwrap();
+            let var: $t = VariantExt::<_, VariantDestructor>::from_variant(var).unwrap();
             assert_eq!(v, var);
         };
         (Box<$t:ty>, $val:expr, $vt:expr) => {
@@ -888,38 +963,28 @@ mod test {
     fn variant() {
         let b = 156u8;
         let c = Variant::wrap(b);
-        let v = VariantExt::<_>::into_variant(c).unwrap();
-        let v: Variant<u8, u8>  = VariantExt::<_>::from_variant(v).unwrap();
+        let v = VariantExt::<_, VariantDestructor>::into_variant(c).unwrap();
+        let v: Variant<u8, u8>  = VariantExt::<_, VariantDestructor>::from_variant(v).unwrap();
         let d = v.unwrap();
         assert_eq!(d, b);
     }
     #[test]
     fn variant2() {
+        use crate::DefaultDestructor;
         let b = Variants::Byte(-77i8);
-        let c = VariantExt::<_>::into_variant(b).unwrap();
-        let _d: Variants = VariantExt::<_>::from_variant(c).unwrap();
+        let c = VariantExt::<_, DefaultDestructor>::into_variant(b).unwrap();
+        let _d: Variants = VariantExt::<_, DefaultDestructor>::from_variant(c).unwrap();
     }
     #[test]
     fn varwrapper() {
-        let mut v: Vec<&dyn VariantWrapper> = vec![
-            &Variants::Byte(-67), 
-            &Variants::UShort(10000),
+        use std::vec::IntoIter;
+        use crate::SafeArrayExt;
+        let v: Vec<Box<VariantWrapper>> = vec![
+            Box::new(Variants::Byte(-67)), 
+            Box::new(Variants::UShort(10000)),
         ];
-        let mut sa: Vec<Ptr<VARIANT>> = v.drain(..).filter_map(|i| {
-            let i = i.into_var();
-            match i {
-                Ok(i) => Some(i), 
-                Err(_) => None
-            }
-        }).collect();
-        let out: Vec<Variants> = sa.drain(..).filter_map(|i| {
-            let i = i.from_var();
-            match i {
-                Ok(i) => Some(i), 
-                Err(_) => None
-            }
-        }).collect();
-        assert_eq!(out.len(), 2);
+        let sa = v.into_iter().into_safearray().unwrap();
+        let _out = <IntoIter<Variants> as SafeArrayExt<Variants>>::from_safearray(sa);
     }
     #[test]
     fn empty() {
