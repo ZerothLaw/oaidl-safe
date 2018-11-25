@@ -182,6 +182,8 @@ impl DroppableBString {
     /// memory yourself. Most uses of BSTR in FFI will
     /// free the memory for you. 
     /// 
+    /// ## Memory Safety
+    /// 
     /// This method is very unsafe to use unless you know
     /// how to handle it correctly, hence the `unsafe` marker. 
     pub unsafe fn consume(&mut self) -> *mut u16 {

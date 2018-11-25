@@ -8,9 +8,6 @@ pub enum ElementError {
     /// Holds IntoSafeArrElemErrors in a box
     #[fail(display = "{}", _0)]
     Into(Box<IntoSafeArrElemError>), 
-    /// VariantWrapper
-    #[fail(display = "")]
-    PtrVariantCannotBecomeTraitObject,
 }
 
 impl From<FromSafeArrElemError> for ElementError {
@@ -242,9 +239,9 @@ pub enum FromVariantError {
     /// `VARIANT` pointer during conversion was null
     #[fail(display = "VARIANT pointer is null")]
     VariantPtrNull,
-    /// 
-    #[fail(display = "")]
-    VariantsConversionError,
+    /// Unknown VT for 
+    #[fail(display = "Variants does not support this vartype: {:p}", _0)]
+    UnknownVarType(u16)
 }
 
 /// Encapsulates errors that can occur during conversion into VARIANT

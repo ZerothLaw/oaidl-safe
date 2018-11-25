@@ -116,9 +116,10 @@ mod ptr;
 mod types;
 mod variant;
 
-// Types = DroppableBString, Ptr, Currency, Date, DecWrapper, Int, SCode, UInt, VariantBool, 
-//  Variant, VtEmpty, VtNull, 
-// Traits = BStringExt, SafeArrayElement, SafeArrayExt, VariantExt
+// Types = DroppableBString, Ptr, Currency, Date, DecWrapper, DefaultDestructor, 
+//  DropDestructor, Int, SCode, UInt, VariantBool, Variant, Variants, VtEmpty, 
+//  VtNull 
+// Traits = BStringExt, PtrDestructor, SafeArrayElement, SafeArrayExt, VariantExt
 pub use self::array::{SafeArrayDestructor,  SafeArrayElement, SafeArrayExt, SafeArrayPtrElement};
 pub use self::bstr::{BStringExt, DroppableBString};
 pub use self::errors::*;

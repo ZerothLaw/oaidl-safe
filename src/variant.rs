@@ -413,9 +413,8 @@ where
 
 impl<D, T, VD> Variant<D, T, VD> 
 where
-    D: VariantExt<T, VD> + TryConvert<T, FromVariantError> + self::private::VariantAccess<VD, Field=T>,
-    VD: PtrDestructor<VARIANT>, 
-    T: TryConvert<D, IntoVariantError>
+    D: VariantExt<T, VD>,
+    VD: PtrDestructor<VARIANT>
 {
     /// Associated method to wrap a VariantExt compatible type `D` into a Variant
     pub fn wrap(d: D) -> Self {
@@ -434,9 +433,8 @@ where
 
 impl<D, T, VD> TryConvert<Ptr<VARIANT, VD>, FromVariantError> for Variant<D, T, VD> 
 where
-    D: VariantExt<T, VD> + TryConvert<T, FromVariantError> + self::private::VariantAccess<VD, Field=T>,
-    VD: PtrDestructor<VARIANT>, 
-    T: TryConvert<D, IntoVariantError>
+    D: VariantExt<T, VD>,
+    VD: PtrDestructor<VARIANT>
 {
     /// Converts a [`Ptr<VARIANT>`] to a [`Variant<D, T>`] where D: [`VariantExt<T>`]
     fn try_convert(ptr: Ptr<VARIANT, VD>) -> Result<Self, FromVariantError> {
@@ -446,9 +444,8 @@ where
 
 impl<D, T, VD> TryConvert<Variant<D, T, VD>, IntoVariantError> for Ptr<VARIANT, VD> 
 where
-    D: VariantExt<T, VD> + TryConvert<T, FromVariantError> + self::private::VariantAccess<VD, Field=T>,
-    VD: PtrDestructor<VARIANT>, 
-    T: TryConvert<D, IntoVariantError>
+    D: VariantExt<T, VD>,
+    VD: PtrDestructor<VARIANT>
 {
     /// Converts a  [`Variant<D, T>`] to a [`Ptr<VARIANT>`] where D: [`VariantExt<T>`]
     /// This converts the value *inside* Variant into a Ptr<VARIANT> which is then stuffed
@@ -461,9 +458,8 @@ where
 
 impl<D, T, VD> TryConvert<Variant<D, T, VD>, ElementError> for Ptr<VARIANT, VD> 
 where
-    D: VariantExt<T, VD> + TryConvert<T, FromVariantError> + self::private::VariantAccess<VD, Field=T>,
-    VD: PtrDestructor<VARIANT>, 
-    T: TryConvert<D, IntoVariantError>
+    D: VariantExt<T, VD>,
+    VD: PtrDestructor<VARIANT>
 {
     /// Converts a  [`Variant<D, T>`] to a [`Ptr<VARIANT>`] where D: [`VariantExt<T>`]
     /// This converts the value *inside* Variant into a Ptr<VARIANT> which is then stuffed
@@ -476,9 +472,8 @@ where
 
 impl<D, T, VD> TryConvert<Ptr<VARIANT, VD> , ElementError> for Variant<D, T, VD> 
 where
-    D: VariantExt<T, VD> + TryConvert<T, FromVariantError> + self::private::VariantAccess<VD, Field=T>,
-    VD: PtrDestructor<VARIANT>, 
-    T: TryConvert<D, IntoVariantError>
+    D: VariantExt<T, VD>,
+    VD: PtrDestructor<VARIANT>
 {
     /// Converts a [`Ptr<VARIANT>`] to a [`Variant<D, T>`] where D: [`VariantExt<T>`]
     fn try_convert(ptr: Ptr<VARIANT, VD> ) -> Result<Self, ElementError> {
@@ -582,7 +577,7 @@ impl TryConvert<VtNull, IntoVariantError> for () {
     }
 }
 
-/// Convenience Enum 
+/// Convenience Enum to enable VariantWrapper as a trait object.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Variants {
     /// VT_I8 - 8 byte signed int
@@ -686,7 +681,7 @@ where
             VT_UI8 => Ok(Variants::ULongLong(VariantExt::<_, D>::from_variant(ptr)?)),  
             VT_INT => Ok(Variants::Int(VariantExt::<_, D>::from_variant(ptr)?)), 
             VT_UINT => Ok(Variants::UInt(VariantExt::<_, D>::from_variant(ptr)?)),
-            _ => panic!()
+            _ => Err(FromVariantError::UnknownVarType(vt))
         }
     }
 } 
@@ -734,6 +729,14 @@ where
     }
 }
 
+impl<'t, D> TryConvert<&'t mut Variants, IntoVariantError> for Ptr<VARIANT, D> 
+where
+    D: PtrDestructor<VARIANT>
+{
+    fn try_convert(var: &'t mut Variants) -> Result<Self, IntoVariantError> {
+        <Ptr<VARIANT, D> as TryConvert<Variants, IntoVariantError>>::try_convert(var.clone())
+    }
+}
 
 impl<D> TryConvert<Ptr<VARIANT, D>, ElementError> for Variants 
 where
@@ -771,7 +774,22 @@ where
     }
 }
 
-///
+/// Trait to enable dynamic dispatch and therefore a Vec of rust values (boxed).
+/// 
+/// ## Usage Example
+/// 
+/// ```
+/// extern crate oaidl;
+/// use oaidl::{Variants, VariantWrapper};
+/// 
+/// fn main() {
+///     let _v: Vec<Box<VariantWrapper>> = vec![
+///         Box::new(Variants::from(100u8)), 
+///         Box::new(Variants::from(-15i8))
+///     ];
+///     // Convert to a safearray or whatever else you want to do.
+/// }
+/// ```
 pub trait VariantWrapper<D=VariantDestructor> 
 where 
     D: PtrDestructor<VARIANT>

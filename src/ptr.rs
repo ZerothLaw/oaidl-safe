@@ -8,19 +8,23 @@ pub trait PtrDestructor<T> {
     fn drop(ptr: NonNull<T>);
 }
 
-/// Placeholder that doesn't free the memory
+/// Default destructor that does not free the memory. 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, PartialOrd)]
 pub struct DefaultDestructor;
 impl<T> PtrDestructor<T> for DefaultDestructor 
 {
+    /// This impl *will* leak the `*mut T`. 
     fn drop(_ptr: NonNull<T>) {}
 }
 
-///Automatically frees the memory pointed to by `Ptr<t>`
+/// Automatically frees the memory pointed to by `Ptr<T>`. 
+/// Uses `std::ptr::drop_in_place` to drop T generically. 
+/// This isn't desirable in all situations however.  
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, PartialOrd)]
 pub struct DropDestructor;
 impl<T> PtrDestructor<T> for DropDestructor 
 {
+    /// 
     fn drop(ptr: NonNull<T>) {
         let p: *mut T = ptr.as_ptr();
         drop(ptr);
@@ -28,8 +32,19 @@ impl<T> PtrDestructor<T> for DropDestructor
     }
 }
 
-/// Convenience type for holding value of `*mut T`
-/// Mostly just a projection of [`NonNull<T>`] functionality
+/// Convenience type for holding value of `*mut T`.
+/// Mostly just a projection of [`NonNull<T>`] functionality.
+/// 
+/// ## Invariants
+/// 
+/// `*mut T` is guaranteed to be NonNull. 
+/// 
+/// ## Memory Safety
+/// 
+/// The default destructor will not drop the *mut T. Therefore, 
+/// when the `Ptr<T>` is dropped, the memory will be leaked. 
+/// 
+/// Use `DropDestructor` if you want to drop the *mut T in the standard way.  
 #[derive(Debug, Eq, Hash, PartialOrd, PartialEq)]
 pub struct Ptr<T, D = DefaultDestructor> 
 where
@@ -39,7 +54,6 @@ where
     _marker: PhantomData<D>
 }
 
-//impl<T: Copy> Copy for Ptr<T> {}
 impl<T: Clone> Clone for Ptr<T> {
     fn clone(&self) -> Self {
         Ptr {inner: self.inner.clone(), _marker: PhantomData}
@@ -86,7 +100,8 @@ where
         }
     }
 
-    /// Get inner reference
+    /// Get inner reference. 
+    /// 
     /// ## Safety
     /// 
     /// The underlying `.as_ref` call is unsafe so this is unsafe as well, 
@@ -105,12 +120,33 @@ where
         }
     }
 
-    /// Cast a `Ptr<T, D>` to `Ptr<U, Q>`
+    /// Get inner mutable reference. 
+    /// 
+    /// ## Safety
+    /// 
+    /// The underlying `.as_ref` call is unsafe so this is unsafe as well, 
+    /// in order to propagate the unsafety invariant forward.
+    /// 
+    /// The lifetime of the provided reference is tied to self. 
+    /// 
+    /// If you need an unbound lifetime, use `&mut *my_ptr.as_ptr()` instead.
+    pub unsafe fn as_mut(&mut self) -> &mut T {
+        if let Some(ref mut nn) = &mut self.inner {
+            nn.as_mut()
+        } else {
+            //safe because only time this is null is right before destruction (ie, a cast<U,Q>)
+            // or drop
+            unreachable!()
+        }
+    }
+
+    /// Cast a `Ptr<T, D>` to `Ptr<U, Q>`. 
+    /// Whatever the `D` is here, the `T` will not be dropped. 
     pub fn cast<U, Q>(mut self) -> Ptr<U, Q> 
     where
         Q: PtrDestructor<U>
     {
-        //We take here so as to ensure the T isn't dropped
+        // We take here so as to ensure the T isn't dropped
         if let Some(nn) = self.inner.take() {
             Ptr::new(nn.cast())
         } else {
@@ -145,6 +181,7 @@ where
 impl<T> Into<NonNull<T>> for Ptr<T> {
     /// Need to use Into because of orphan rules
     fn into(mut self) -> NonNull<T> {
+        // Use .take to ensure that the `*mut T` doesn't get dropped. 
         if let Some(nn) = self.inner.take() {
             nn
         } else {

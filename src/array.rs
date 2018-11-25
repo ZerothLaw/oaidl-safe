@@ -322,21 +322,7 @@ impl SafeArrayElement for Box<VariantWrapper>
         <Self as SafeArrayPtrElement>::into_safearray(self, psa, ix)
     }
 }
-// impl<'var> SafeArrayElement for &'var dyn CVariantWrapper 
-// {
-//     const SFTYPE: u32 = VT_VARIANT;
-//     type Element = Ptr<VARIANT>;
 
-//     #[doc(hidden)]
-//     fn from_safearray(psa: *mut SAFEARRAY, ix: i32) -> Result<Self::Element, ElementError> {
-//         <Self as SafeArrayPtrElement>::from_safearray(psa,ix)
-//     }
-
-//     #[doc(hidden)]
-//     fn into_safearray(self, psa: *mut SAFEARRAY, ix: i32) -> Result<(), ElementError> {
-//         <Self as SafeArrayPtrElement>::into_safearray(self, psa, ix)
-//     }
-// }
 impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for ['DecWrapper']. This allows it to be converted into SAFEARRAY with vt = `VT_DECIMAL`."]DecWrapper => DECIMAL, VT_DECIMAL);
 //VT_RECORD
 impl_safe_arr_elem!(#[doc="`SafeArrayElement` impl for `i8`. This allows it to be converted into SAFEARRAY with vt = `VT_I1`."]i8, VT_I1);
