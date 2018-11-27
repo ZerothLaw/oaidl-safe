@@ -1,20 +1,19 @@
-
 //! # Types
-//! Convenience wrapper types and conversion logic for the winapi-defined types: 
+//! Convenience wrapper types and conversion logic for the winapi-defined types:
 //!   * CY
 //!   * DATE
 //!   * DECIMAL
 //!   * VARIANT_BOOL
-//! 
-//! Also implements TryFrom when feature "impl_tryfrom" is turned on in configuration. Only works on Nightly! 
-//! 
+//!
+//! Also implements TryFrom when feature "impl_tryfrom" is turned on in configuration. Only works on Nightly!
+//!
 use std::fmt;
 
 #[cfg(feature = "impl_tryfrom")]
-use std::convert::{TryFrom};
+use std::convert::TryFrom;
 
 #[cfg(feature = "impl_tryfrom")]
-use std::num::{TryFromIntError};
+use std::num::TryFromIntError;
 
 use failure;
 
@@ -22,26 +21,28 @@ use rust_decimal::Decimal;
 
 use winapi::shared::wtypes::{CY, DECIMAL, DECIMAL_NEG, VARIANT_BOOL, VARIANT_TRUE};
 
-use super::errors::{ConversionError, ElementError, FromVariantError, IntoVariantError, SafeArrayError};
+use super::errors::{
+    ConversionError, ElementError, FromVariantError, IntoVariantError, SafeArrayError,
+};
 
 /// Pseudo-`From` trait because of orphan rules
-pub trait TryConvert<T, F> 
-where 
-    Self: Sized, 
+pub trait TryConvert<T, F>
+where
+    Self: Sized,
     F: failure::Fail,
 {
     /// Utility method which can fail.
     fn try_convert(val: T) -> Result<Self, F>;
 }
 
-impl<T, F> TryConvert<T, F> for T 
+impl<T, F> TryConvert<T, F> for T
 where
-    T: From<T>, 
-    F: failure::Fail 
+    T: From<T>,
+    F: failure::Fail,
 {
     /// Blanket TryConvert implementation wherever a From<T> is implemented for T. (Which is all types.)
-    /// This avoids repetitive code. The compiler monomorphizes the code for F. 
-    /// And because its always an Ok, should optimize this code away. 
+    /// This avoids repetitive code. The compiler monomorphizes the code for F.
+    /// And because its always an Ok, should optimize this code away.
     fn try_convert(val: T) -> Result<Self, F> {
         Ok(val)
     }
@@ -117,54 +118,54 @@ macro_rules! wrapper_conv_impl {
 
 macro_rules! conversions_impl {
     ($inner:ident, $wrapper:ident) => {
-        impl TryConvert<$inner,FromVariantError> for $wrapper {
+        impl TryConvert<$inner, FromVariantError> for $wrapper {
             /// Does not return any errors.
-            fn try_convert(val: $inner) -> Result<Self,FromVariantError> {
+            fn try_convert(val: $inner) -> Result<Self, FromVariantError> {
                 Ok($wrapper::from(val))
             }
         }
 
-        impl TryConvert<$wrapper,IntoVariantError> for $inner {
+        impl TryConvert<$wrapper, IntoVariantError> for $inner {
             /// Does not return any errors.
-            fn try_convert(val: $wrapper) -> Result<Self,IntoVariantError> {
+            fn try_convert(val: $wrapper) -> Result<Self, IntoVariantError> {
                 Ok($inner::from(val))
             }
         }
 
-        impl<'c> TryConvert<&'c $inner,FromVariantError> for $wrapper {
+        impl<'c> TryConvert<&'c $inner, FromVariantError> for $wrapper {
             /// Does not return any errors.
-            fn try_convert(val: &'c $inner) -> Result<Self,FromVariantError> {
+            fn try_convert(val: &'c $inner) -> Result<Self, FromVariantError> {
                 Ok($wrapper::from(val))
             }
         }
 
-        impl<'c> TryConvert<&'c $wrapper,IntoVariantError> for $inner {
+        impl<'c> TryConvert<&'c $wrapper, IntoVariantError> for $inner {
             /// Does not return any errors.
-            fn try_convert(val: &'c $wrapper) -> Result<Self,IntoVariantError> {
+            fn try_convert(val: &'c $wrapper) -> Result<Self, IntoVariantError> {
                 Ok($inner::from(val))
             }
         }
 
-        impl<'c> TryConvert<&'c mut $inner,FromVariantError> for $wrapper {
+        impl<'c> TryConvert<&'c mut $inner, FromVariantError> for $wrapper {
             /// Does not return any errors.
-            fn try_convert(val: &'c mut $inner) -> Result<Self,FromVariantError> {
+            fn try_convert(val: &'c mut $inner) -> Result<Self, FromVariantError> {
                 Ok($wrapper::from(val))
             }
         }
 
-        impl<'c> TryConvert<&'c mut $wrapper,IntoVariantError> for $inner {
+        impl<'c> TryConvert<&'c mut $wrapper, IntoVariantError> for $inner {
             /// Does not return any errors.
-            fn try_convert(val: &'c mut $wrapper) -> Result<Self,IntoVariantError> {
+            fn try_convert(val: &'c mut $wrapper) -> Result<Self, IntoVariantError> {
                 Ok($inner::from(val))
             }
         }
 
         impl TryConvert<$inner, SafeArrayError> for $wrapper {
             /// Does not return any errors.
-            fn try_convert(val: $inner) -> Result<Self,SafeArrayError> {
+            fn try_convert(val: $inner) -> Result<Self, SafeArrayError> {
                 Ok($wrapper::from(val))
             }
-        } 
+        }
         impl TryConvert<$wrapper, SafeArrayError> for $inner {
             /// Does not return any errors.
             fn try_convert(val: $wrapper) -> Result<Self, SafeArrayError> {
@@ -174,10 +175,10 @@ macro_rules! conversions_impl {
 
         impl TryConvert<$inner, ElementError> for $wrapper {
             /// Does not return any errors.
-            fn try_convert(val: $inner) -> Result<Self,ElementError> {
+            fn try_convert(val: $inner) -> Result<Self, ElementError> {
                 Ok($wrapper::from(val))
             }
-        } 
+        }
         impl TryConvert<$wrapper, ElementError> for $inner {
             /// Does not return any errors.
             fn try_convert(val: $wrapper) -> Result<Self, ElementError> {
@@ -189,7 +190,7 @@ macro_rules! conversions_impl {
 
 /// Helper type for the OLE/COM+ type CY
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Copy, Debug, Eq,  Hash, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialOrd, PartialEq)]
 pub struct Currency(i64);
 
 impl From<CY> for Currency {
@@ -214,19 +215,19 @@ impl<'c> From<&'c mut CY> for Currency {
 impl From<Currency> for CY {
     /// Converts Currency to CY. Consumes the Currency and copies the internal value to CY.
     fn from(cy: Currency) -> CY {
-        CY {int64: cy.0}
+        CY { int64: cy.0 }
     }
 }
 impl<'c> From<&'c Currency> for CY {
     /// Converts Currency to CY. Copies the internal value from the reference.
     fn from(cy: &'c Currency) -> CY {
-        CY {int64: cy.0}
+        CY { int64: cy.0 }
     }
 }
 impl<'c> From<&'c mut Currency> for CY {
     /// Converts Currency to CY. Copies the internal value from the reference.
     fn from(cy: &'c mut Currency) -> CY {
-        CY {int64: cy.0}
+        CY { int64: cy.0 }
     }
 }
 
@@ -285,47 +286,52 @@ impl DecWrapper {
     // Internal conversion function
     fn build_c_decimal(dec: &Decimal) -> DECIMAL {
         let scale = dec.scale() as u8;
-        let sign = if dec.is_sign_positive() {0} else {DECIMAL_NEG};
+        let sign = if dec.is_sign_positive() {
+            0
+        } else {
+            DECIMAL_NEG
+        };
         let serial = dec.serialize();
-        let lo: u64 = (serial[4]  as u64)        + 
-                    ((serial[5]  as u64) << 8)  + 
-                    ((serial[6]  as u64) << 16) + 
-                    ((serial[7]  as u64) << 24) + 
-                    ((serial[8]  as u64) << 32) +
-                    ((serial[9]  as u64) << 40) +
-                    ((serial[10] as u64) << 48) + 
-                    ((serial[11] as u64) << 56);
-        let hi: u32 = (serial[12] as u32)        +
-                    ((serial[13] as u32) << 8)  +
-                    ((serial[14] as u32) << 16) +
-                    ((serial[15] as u32) << 24);
+        let lo: u64 = (serial[4] as u64)
+            + ((serial[5] as u64) << 8)
+            + ((serial[6] as u64) << 16)
+            + ((serial[7] as u64) << 24)
+            + ((serial[8] as u64) << 32)
+            + ((serial[9] as u64) << 40)
+            + ((serial[10] as u64) << 48)
+            + ((serial[11] as u64) << 56);
+        let hi: u32 = (serial[12] as u32)
+            + ((serial[13] as u32) << 8)
+            + ((serial[14] as u32) << 16)
+            + ((serial[15] as u32) << 24);
         DECIMAL {
-            wReserved: 0, 
-            scale: scale, 
-            sign: sign, 
-            Hi32: hi, 
-            Lo64: lo
+            wReserved: 0,
+            scale: scale,
+            sign: sign,
+            Hi32: hi,
+            Lo64: lo,
         }
     }
 
     fn build_rust_decimal(dec: &DECIMAL) -> Decimal {
-        let sign = if dec.sign == DECIMAL_NEG {true} else {false};
-        Decimal::from_parts((dec.Lo64 & 0xFFFFFFFF) as u32, 
-                            ((dec.Lo64 >> 32) & 0xFFFFFFFF) as u32, 
-                            dec.Hi32, 
-                            sign,
-                            dec.scale as u32 ) 
+        let sign = if dec.sign == DECIMAL_NEG { true } else { false };
+        Decimal::from_parts(
+            (dec.Lo64 & 0xFFFFFFFF) as u32,
+            ((dec.Lo64 >> 32) & 0xFFFFFFFF) as u32,
+            dec.Hi32,
+            sign,
+            dec.scale as u32,
+        )
     }
-
 }
 //Conversions between triad of types:
 //                    DECIMAL    |   DecWrapper   |   Decimal
 //   DECIMAL    |      N/A       | owned, &, &mut | orphan rules
-//   DecWrapper | owned, &, &mut |     N/A        | owned, &, &mut 
+//   DecWrapper | owned, &, &mut |     N/A        | owned, &, &mut
 //   Decimal    | orphan rules   | owned, &, &mut |     N/A
 //
 // Ophan rules mean that I can't apply traits from other crates
-// to types that come from still other traits. 
+// to types that come from still other traits.
 
 //DECIMAL to DecWrapper conversions
 impl From<DECIMAL> for DecWrapper {
@@ -352,21 +358,21 @@ impl<'d> From<&'d mut DECIMAL> for DecWrapper {
 
 //DecWrapper to DECIMAL conversions
 impl From<DecWrapper> for DECIMAL {
-    /// Converts a DecWrapper into  DECIMAL. 
+    /// Converts a DecWrapper into  DECIMAL.
     /// Allocates a new DECIMAL
     fn from(d: DecWrapper) -> DECIMAL {
         DecWrapper::build_c_decimal(&d.0)
     }
 }
 impl<'d> From<&'d DecWrapper> for DECIMAL {
-    /// Converts a DecWrapper into  DECIMAL. 
+    /// Converts a DecWrapper into  DECIMAL.
     /// Allocates a new DECIMAL
     fn from(d: &'d DecWrapper) -> DECIMAL {
         DecWrapper::build_c_decimal(&d.0)
     }
 }
 impl<'d> From<&'d mut DecWrapper> for DECIMAL {
-    /// Converts a DecWrapper into  DECIMAL. 
+    /// Converts a DecWrapper into  DECIMAL.
     /// Allocates a new DECIMAL
     fn from(d: &'d mut DecWrapper) -> DECIMAL {
         DecWrapper::build_c_decimal(&d.0)
@@ -375,21 +381,21 @@ impl<'d> From<&'d mut DecWrapper> for DECIMAL {
 
 //DecWrapper to Decimal conversions
 impl From<DecWrapper> for Decimal {
-    /// Converts a DecWrapper into Decimal. 
+    /// Converts a DecWrapper into Decimal.
     /// Zero cost or allocations.
     fn from(dw: DecWrapper) -> Decimal {
         dw.0
     }
 }
 impl<'w> From<&'w DecWrapper> for Decimal {
-    /// Converts a DecWrapper into Decimal. 
+    /// Converts a DecWrapper into Decimal.
     /// Zero cost or allocations.
     fn from(dw: &'w DecWrapper) -> Decimal {
         dw.0
     }
 }
 impl<'w> From<&'w mut DecWrapper> for Decimal {
-    /// Converts a DecWrapper into Decimal. 
+    /// Converts a DecWrapper into Decimal.
     /// Zero cost or allocations.
     fn from(dw: &'w mut DecWrapper) -> Decimal {
         dw.0
@@ -427,49 +433,61 @@ impl AsRef<Decimal> for DecWrapper {
 conversions_impl!(DECIMAL, DecWrapper);
 
 /// Helper type for the OLE/COM+ type VARIANT_BOOL
-/// 
-/// A VARIANT_Bool represents true as 0x0, and false as 0xFFFF. 
-/// 
-/// This means there's a bit of conversion logic required. 
+///
+/// A VARIANT_Bool represents true as 0x0, and false as 0xFFFF.
+///
+/// This means there's a bit of conversion logic required.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct VariantBool(bool);
 
 impl From<VariantBool> for VARIANT_BOOL {
-    /// Converts a VariantBool into a VARIANT_BOOL. 
+    /// Converts a VariantBool into a VARIANT_BOOL.
     fn from(vb: VariantBool) -> VARIANT_BOOL {
-        if vb.0 {VARIANT_TRUE} else {0}
+        if vb.0 {
+            VARIANT_TRUE
+        } else {
+            0
+        }
     }
 }
 impl<'v> From<&'v VariantBool> for VARIANT_BOOL {
-    /// Converts a VariantBool into a VARIANT_BOOL. 
+    /// Converts a VariantBool into a VARIANT_BOOL.
     fn from(vb: &'v VariantBool) -> VARIANT_BOOL {
-        if vb.0 {VARIANT_TRUE} else {0}
+        if vb.0 {
+            VARIANT_TRUE
+        } else {
+            0
+        }
     }
 }
 impl<'v> From<&'v mut VariantBool> for VARIANT_BOOL {
-    /// Converts a VariantBool into a VARIANT_BOOL. 
+    /// Converts a VariantBool into a VARIANT_BOOL.
     fn from(vb: &'v mut VariantBool) -> VARIANT_BOOL {
-        if vb.0 {VARIANT_TRUE} else {0}
+        if vb.0 {
+            VARIANT_TRUE
+        } else {
+            0
+        }
     }
 }
 
 impl From<VARIANT_BOOL> for VariantBool {
-    /// Converts a VARIANT_BOOL into a VariantBool. 
+    /// Converts a VARIANT_BOOL into a VariantBool.
     fn from(vb: VARIANT_BOOL) -> VariantBool {
-        VariantBool(vb < 0) 
+        VariantBool(vb < 0)
     }
 }
 impl<'v> From<&'v VARIANT_BOOL> for VariantBool {
-    /// Converts a VARIANT_BOOL into a VariantBool. 
+    /// Converts a VARIANT_BOOL into a VariantBool.
     fn from(vb: &'v VARIANT_BOOL) -> VariantBool {
-        VariantBool(*vb < 0) 
+        VariantBool(*vb < 0)
     }
 }
 impl<'v> From<&'v mut VARIANT_BOOL> for VariantBool {
-    /// Converts a VARIANT_BOOL into a VariantBool. 
+    /// Converts a VARIANT_BOOL into a VariantBool.
     fn from(vb: &'v mut VARIANT_BOOL) -> VariantBool {
-        VariantBool(*vb < 0) 
+        VariantBool(*vb < 0)
     }
 }
 
@@ -517,10 +535,12 @@ conversions_impl!(bool, VariantBool);
 conversions_impl!(VARIANT_BOOL, VariantBool);
 impl_conv_for_box_wrapper!(VARIANT_BOOL, VariantBool);
 
-impl TryConvert<*mut VARIANT_BOOL,ConversionError> for Box<VariantBool> {
-    fn try_convert(p: *mut VARIANT_BOOL) -> Result<Self,ConversionError> {
-        if p.is_null() {return Err(ConversionError::PtrWasNull)}
-        Ok(Box::new(VariantBool::from(unsafe{*p})))
+impl TryConvert<*mut VARIANT_BOOL, ConversionError> for Box<VariantBool> {
+    fn try_convert(p: *mut VARIANT_BOOL) -> Result<Self, ConversionError> {
+        if p.is_null() {
+            return Err(ConversionError::PtrWasNull);
+        }
+        Ok(Box::new(VariantBool::from(unsafe { *p })))
     }
 }
 
@@ -705,13 +725,13 @@ mod tests {
         let d = Decimal::new(0xFFFFFFFFFFFF, 0);
         let d = d * Decimal::new(0xFFFFFFFF, 0);
         assert_eq!(d.is_sign_positive(), true);
-        assert_eq!(format!("{}", d), "1208925819333149903028225" );
-        
+        assert_eq!(format!("{}", d), "1208925819333149903028225");
+
         let c = DecWrapper::build_c_decimal(&d);
         //println!("({}, {}, {}, {})", c.Hi32, c.Lo64, c.scale, c.sign);
         //println!("{:?}", d.serialize());
         assert_eq!(c.Hi32, 65535);
-        assert_eq!(c.Lo64, 18446462594437873665); 
+        assert_eq!(c.Lo64, 18446462594437873665);
         assert_eq!(c.scale, 0);
         assert_eq!(c.sign, 0);
     }
@@ -719,16 +739,16 @@ mod tests {
     #[test]
     fn rust_decimal_from() {
         let d = DECIMAL {
-            wReserved: 0, 
-            scale: 0, 
-            sign: 0, 
-            Hi32: 65535, 
-            Lo64: 18446462594437873665
+            wReserved: 0,
+            scale: 0,
+            sign: 0,
+            Hi32: 65535,
+            Lo64: 18446462594437873665,
         };
         let new_d = DecWrapper::build_rust_decimal(&d);
         //println!("{:?}", new_d.serialize());
-       // assert_eq!(new_d.is_sign_positive(), true);
-        assert_eq!(format!("{}", new_d), "1208925819333149903028225"  );
+        // assert_eq!(new_d.is_sign_positive(), true);
+        assert_eq!(format!("{}", new_d), "1208925819333149903028225");
     }
 
     #[test]

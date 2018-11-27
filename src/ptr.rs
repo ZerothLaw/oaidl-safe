@@ -55,8 +55,17 @@ where
 }
 
 impl<T: Clone> Clone for Ptr<T> {
+    /// This impl *will* allocate a new T. This is because cloning a 
+    /// raw ptr only copies the pointer itself, so the memory location
+    /// is the same. This creates issues when you set up drop glue on your Ptr<T>
+    /// values. 
     fn clone(&self) -> Self {
-        Ptr {inner: self.inner.clone(), _marker: PhantomData}
+        let p = match &self.inner {
+            Some(ref nn) => nn.as_ptr(), 
+            None => unreachable!()
+        };
+        let cloned_t = Box::into_raw(Box::new(unsafe {(*p).clone()}));
+        Ptr {inner: Some(unsafe {NonNull::new_unchecked(cloned_t)}), _marker: PhantomData}
     }
 }
 
