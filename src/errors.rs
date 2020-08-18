@@ -69,7 +69,7 @@ pub enum IntoSafeArrElemError {
     #[fail(display = "{}", _0)]
     BStringFailed(Box<BStringError>),
     /// `SafeArrayPutElement` failed with `HRESULT`
-    #[fail(display = "SafeArrayPutElement failed with HRESULT = 0x{}", hr)]
+    #[fail(display = "SafeArrayPutElement failed with HRESULT = 0x{:x}", hr)]
     PutElementFailed {
         /// HRESULT returned by SafeArrayPutElement call
         hr: i32,
@@ -147,19 +147,19 @@ pub enum FromSafeArrayError {
         found: u32,
     },
     /// Call to SafeArrayGetLBound failed
-    #[fail(display = "SafeArrayGetLBound failed with HRESULT = 0x{}", hr)]
+    #[fail(display = "SafeArrayGetLBound failed with HRESULT = 0x{:x}", hr)]
     SafeArrayLBoundFailed {
         /// HRESULT returned
         hr: i32,
     },
     /// Call to SafeArrayGetRBound failed
-    #[fail(display = "SafeArrayGetRBound failed with HRESULT = 0x{}", hr)]
+    #[fail(display = "SafeArrayGetRBound failed with HRESULT = 0x{:x}", hr)]
     SafeArrayRBoundFailed {
         /// HRESULT returned
         hr: i32,
     },
     /// Call to SafeArrayGetVartype failed
-    #[fail(display = "SafeArrayGetVartype failed with HRESULT = 0x{}", hr)]
+    #[fail(display = "SafeArrayGetVartype failed with HRESULT = 0x{:x}", hr)]
     SafeArrayGetVartypeFailed {
         /// HRESULT returned
         hr: i32,
