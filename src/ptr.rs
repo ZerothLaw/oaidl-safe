@@ -172,7 +172,7 @@ where
 
 impl<T> fmt::Pointer for Ptr<T> {
     /// Formats [`Ptr<T>`] as a pointer value (ie, hexadecimal)
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(ref nn) = &self.inner {
             write!(f, "{:p}", nn)
         } else {

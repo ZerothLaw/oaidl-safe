@@ -9,6 +9,7 @@ readme = "README.md"
 keywords = ["COM", "interop", "safearray", "variant"]
 categories = ["api-bindings", "development-tools::ffi", "os::windows-apis"]
 documentation = "https://docs.rs/oaidl/0.2.1/x86_64-pc-windows-msvc/oaidl/"
+edition = "2018"
 
 [dependencies]
 # mandatory packages

@@ -556,25 +556,25 @@ impl AsRef<i32> for Int {
 }
 
 impl fmt::UpperHex for Int {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:X}", self.0)
     }
 }
 
 impl fmt::LowerHex for Int {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:x}", self.0)
     }
 }
 
 impl fmt::Octal for Int {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:o}", self.0)
     }
 }
 
 impl fmt::Binary for Int {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:b}", self.0)
     }
 }
@@ -624,25 +624,25 @@ impl AsRef<u32> for UInt {
 }
 
 impl fmt::UpperHex for UInt {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:X}", self.0)
     }
 }
 
 impl fmt::LowerHex for UInt {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:x}", self.0)
     }
 }
 
 impl fmt::Octal for UInt {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:o}", self.0)
     }
 }
 
 impl fmt::Binary for UInt {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:b}", self.0)
     }
 }
@@ -693,25 +693,25 @@ impl AsRef<i32> for SCode {
 }
 
 impl fmt::UpperHex for SCode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "0X{:X}", self.0)
     }
 }
 
 impl fmt::LowerHex for SCode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "0x{:x}", self.0)
     }
 }
 
 impl fmt::Octal for SCode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:o}", self.0)
     }
 }
 
 impl fmt::Binary for SCode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:b}", self.0)
     }
 }
