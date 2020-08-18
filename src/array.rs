@@ -333,7 +333,7 @@ impl SafeArrayElement for Variants {
         <Self as SafeArrayPtrElement>::into_safearray(self, psa, ix)
     }
 }
-impl SafeArrayElement for Box<VariantWrapper> {
+impl SafeArrayElement for Box<dyn VariantWrapper> {
     const SFTYPE: u32 = VT_VARIANT;
     type Element = Ptr<VARIANT, VariantDestructor>;
 
@@ -517,7 +517,7 @@ where
         assert!(!psa.is_null());
         let psa: Ptr<SAFEARRAY, SafeArrayDestructor> = Ptr::with_checked(psa).unwrap();
 
-        for (ix, mut elem) in self.enumerate() {
+        for (ix, elem) in self.enumerate() {
             match <Itr::Item as SafeArrayElement>::into_safearray(elem, psa.as_ptr(), ix as i32) {
                 Ok(()) => continue,
                 //Safe-ish to do because memory allocated will be freed.
