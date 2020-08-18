@@ -379,7 +379,6 @@ pub(crate) mod private {
         }
         fn into_var(_inner: Self::Field, _n1: &mut VARIANT_n1, _n3: &mut VARIANT_n3) {}
     }
-
 }
 
 /// Container for variant-compatible types. Wrap them with this
