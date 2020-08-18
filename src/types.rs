@@ -15,7 +15,7 @@ use std::convert::TryFrom;
 #[cfg(feature = "impl_tryfrom")]
 use std::num::TryFromIntError;
 
-use failure;
+use std::error::Error;
 
 use rust_decimal::Decimal;
 
@@ -29,7 +29,7 @@ use super::errors::{
 pub trait TryConvert<T, F>
 where
     Self: Sized,
-    F: failure::Fail,
+    F: Error,
 {
     /// Utility method which can fail.
     fn try_convert(val: T) -> Result<Self, F>;
@@ -38,7 +38,7 @@ where
 impl<T, F> TryConvert<T, F> for T
 where
     T: From<T>,
-    F: failure::Fail,
+    F: Error,
 {
     /// Blanket TryConvert implementation wherever a From<T> is implemented for T. (Which is all types.)
     /// This avoids repetitive code. The compiler monomorphizes the code for F.

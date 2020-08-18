@@ -95,8 +95,7 @@
 //! [`SafeArrayExt`]: trait.SafeArrayExt.html
 //! [`VariantExt`]: trait.VariantExt.html
 
-#[macro_use]
-extern crate failure;
+extern crate thiserror;
 
 extern crate rust_decimal;
 

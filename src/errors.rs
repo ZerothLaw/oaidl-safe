@@ -1,12 +1,15 @@
-use failure::Error;
+use std::error::Error;
+
+use thiserror::Error;
+
 /// Supererror type for SafeArray element conversion errors
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum ElementError {
     /// Holds FromSafeArrElemErrors in a box
-    #[fail(display = "{}", _0)]
+    #[error(transparent)]
     From(Box<FromSafeArrElemError>),
     /// Holds IntoSafeArrElemErrors in a box
-    #[fail(display = "{}", _0)]
+    #[error(transparent)]
     Into(Box<IntoSafeArrElemError>),
 }
 
@@ -39,20 +42,20 @@ impl From<FromVariantError> for ElementError {
 }
 
 /// Errors for converting from C/C++ data structure to Rust types
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum FromSafeArrElemError {
     /// The unsafe call to SafeArrayGetElement failed - HRESULT stored within tells why
-    #[fail(display = "SafeArrayGetElement failed with HRESULT=0x{:x}", hr)]
+    #[error("SafeArrayGetElement failed with HRESULT=0x{hr:x}")]
     GetElementFailed {
         /// Holds an HRESULT value
         hr: i32,
     },
     /// Holds a [`BStringError`] in a box.
-    #[fail(display = "{}", _0)]
+    #[error(transparent)]
     BStringFailed(Box<BStringError>),
     /// [`from_variant`] failed somehow. Error is stored in a box.
-    #[fail(display = "from variant failure: {}", _0)]
-    FromVarError(Box<FromVariantError>),
+    #[error("from variant failure")]
+    FromVarError(#[source] Box<FromVariantError>),
 }
 
 impl From<FromVariantError> for FromSafeArrElemError {
@@ -63,20 +66,20 @@ impl From<FromVariantError> for FromSafeArrElemError {
 }
 
 /// Errors for converting into C/C++ data structures from Rust types
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum IntoSafeArrElemError {
     /// `SysAllocStringLen` failed with len
-    #[fail(display = "{}", _0)]
+    #[error(transparent)]
     BStringFailed(Box<BStringError>),
     /// `SafeArrayPutElement` failed with `HRESULT`
-    #[fail(display = "SafeArrayPutElement failed with HRESULT = 0x{:x}", hr)]
+    #[error("SafeArrayPutElement failed with HRESULT = 0x{hr:x}")]
     PutElementFailed {
         /// HRESULT returned by SafeArrayPutElement call
         hr: i32,
     },
     /// Encapsulates a `IntoVariantError`
-    #[fail(display = "IntoVariantError: {}", _0)]
-    IntoVariantError(Box<IntoVariantError>),
+    #[error("IntoVariantError")]
+    IntoVariantError(#[source] Box<IntoVariantError>),
 }
 
 impl From<IntoVariantError> for IntoSafeArrElemError {
@@ -94,13 +97,13 @@ impl From<BStringError> for IntoSafeArrElemError {
 }
 
 /// Supererror for SafeArray errors
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum SafeArrayError {
     /// From wrapper for `FromSafeArrayError`
-    #[fail(display = "{}", _0)]
+    #[error(transparent)]
     From(Box<FromSafeArrayError>),
     /// Into wrapper for `IntoSafeArrayError`
-    #[fail(display = "{}", _0)]
+    #[error(transparent)]
     Into(Box<IntoSafeArrayError>),
 }
 
@@ -126,20 +129,17 @@ impl From<FromVariantError> for SafeArrayError {
 }
 
 /// Represents the different ways converting from `SAFEARRAY` can fail
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum FromSafeArrayError {
     /// Either the safe array dimensions = 0 or > 1
     /// multi-dimensional arrays are *not* handled.
-    #[fail(display = "Safe array dimensions are invalid: {}", sa_dims)]
+    #[error("Safe array dimensions are invalid: {}", sa_dims)]
     SafeArrayDimsInvalid {
         /// safe array dimensions that was wrong
         sa_dims: u32,
     },
     /// Expected vartype did not match found vartype - runtime consistency check
-    #[fail(
-        display = "expected vartype was not found - expected: {} - found: {}",
-        expected, found
-    )]
+    #[error("expected vartype was not found - expected: {expected} - found: {found}")]
     VarTypeDoesNotMatch {
         /// The expected vartype
         expected: u32,
@@ -147,36 +147,34 @@ pub enum FromSafeArrayError {
         found: u32,
     },
     /// Call to SafeArrayGetLBound failed
-    #[fail(display = "SafeArrayGetLBound failed with HRESULT = 0x{:x}", hr)]
+    #[error("SafeArrayGetLBound failed with HRESULT = 0x{:x}", hr)]
     SafeArrayLBoundFailed {
         /// HRESULT returned
         hr: i32,
     },
     /// Call to SafeArrayGetRBound failed
-    #[fail(display = "SafeArrayGetRBound failed with HRESULT = 0x{:x}", hr)]
+    #[error("SafeArrayGetRBound failed with HRESULT = 0x{:x}", hr)]
     SafeArrayRBoundFailed {
         /// HRESULT returned
         hr: i32,
     },
     /// Call to SafeArrayGetVartype failed
-    #[fail(display = "SafeArrayGetVartype failed with HRESULT = 0x{:x}", hr)]
+    #[error("SafeArrayGetVartype failed with HRESULT = 0x{:x}", hr)]
     SafeArrayGetVartypeFailed {
         /// HRESULT returned
         hr: i32,
     },
     /// Encapsulates the `ElementError` that occurred during conversion
-    #[fail(
-        display = "element conversion failed at index {} with {}",
-        index, element
-    )]
+    #[error("element conversion failed at index {index} with {element}")]
     ElementConversionFailed {
         /// the index the conversion failed at
         index: usize,
         /// The element error encapsulating the failure
+        #[source]
         element: Box<ElementError>,
     },
     /// [`from_variant`] call failed
-    #[fail(display = "from variant failure: {}", _0)]
+    #[error("from variant failure: {}", _0)]
     FromVariantError(Box<FromVariantError>),
 }
 
@@ -200,22 +198,20 @@ impl FromSafeArrayError {
 }
 
 /// Represents the different ways converting into `SAFEARRAY` can fail
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum IntoSafeArrayError {
     /// Encapsulates the [`ElementError`] that occurred during conversion
-    #[fail(
-        display = "element conversion failed at index {} with {}",
-        index, element
-    )]
+    #[error("element conversion failed at index {index} with {element}")]
     ElementConversionFailed {
         /// the index the conversion failed at
         index: usize,
         /// The element error encapsulating the failure
+        #[source]
         element: Box<ElementError>,
     },
     /// into_variant call failed
-    #[fail(display = "into variant failure: {}", _0)]
-    IntoVariantError(Box<IntoVariantError>),
+    #[error("into variant failure")]
+    IntoVariantError(#[source] Box<IntoVariantError>),
 }
 
 impl From<IntoVariantError> for IntoSafeArrayError {
@@ -238,10 +234,10 @@ impl IntoSafeArrayError {
 }
 
 /// Ways BString can fail. Currently just one way.
-#[derive(Clone, Copy, Debug, Fail)]
+#[derive(Clone, Copy, Debug, Error)]
 pub enum BStringError {
     /// SysAllocStringLen failed
-    #[fail(display = "BSTR allocation failed for len: {}", len)]
+    #[error("BSTR allocation failed for len: {len}")]
     AllocateFailed {
         /// The len which was used for allocation
         len: usize,
@@ -249,27 +245,27 @@ pub enum BStringError {
 }
 
 /// Encapsulates the ways converting from a `VARIANT` can fail.
-#[derive(Copy, Clone, Debug, Fail)]
+#[derive(Copy, Clone, Debug, Error)]
 pub enum FromVariantError {
     /// `VARIANT` pointer during conversion was null
-    #[fail(display = "VARIANT pointer is null")]
+    #[error("VARIANT pointer is null")]
     VariantPtrNull,
     /// Unknown VT for
-    #[fail(display = "Variants does not support this vartype: {:p}", _0)]
+    #[error("Variants does not support this vartype: {0:p}")]
     UnknownVarType(u16),
 }
 
 /// Encapsulates errors that can occur during conversion into VARIANT
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum IntoVariantError {
     /// Encapsulates a `BStringError`
-    #[fail(display = "{}", _0)]
+    #[error(transparent)]
     AllocBStrFailed(Box<BStringError>),
     /// Encapsulates a `SafeArrayError`
-    #[fail(display = "SafeArray conversion failed: {}", _0)]
-    SafeArrConvFailed(Box<SafeArrayError>),
+    #[error("SafeArray conversion failed")]
+    SafeArrConvFailed(#[source] Box<SafeArrayError>),
     ///
-    #[fail(display = "Can't convert &dyn CVariantWrappers into Ptr<VARIANTS>")]
+    #[error("Can't convert &dyn CVariantWrappers into Ptr<VARIANTS>")]
     CVarWrapper,
 }
 
@@ -281,12 +277,12 @@ impl From<BStringError> for IntoVariantError {
 }
 
 /// Errors which can arise primarily from using `Conversion::convert` calls
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum ConversionError {
     /// Ptr being used was null
-    #[fail(display = "pointer was null")]
+    #[error("pointer was null")]
     PtrWasNull,
-    /// General purpose holder of `failure::Error` values
-    #[fail(display = "{}", _0)]
-    General(Box<Error>),
+    /// General purpose holder of `std::error::Error` values
+    #[error(transparent)]
+    General(Box<dyn Error>),
 }
