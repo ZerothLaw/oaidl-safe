@@ -95,18 +95,9 @@
 //! [`SafeArrayExt`]: trait.SafeArrayExt.html
 //! [`VariantExt`]: trait.VariantExt.html
 
-#[macro_use]
-extern crate failure;
-
-extern crate rust_decimal;
-
 #[cfg(feature = "serde")]
 #[macro_use]
 extern crate serde;
-
-extern crate widestring;
-
-extern crate winapi;
 
 mod array;
 mod bstr;

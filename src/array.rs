@@ -285,12 +285,12 @@ impl SafeArrayElement for U16String {
 }
 impl_safe_arr_elem!(
     #[doc="`SafeArrayElement` impl for ['SCode']. This allows it to be converted into SAFEARRAY with vt = `VT_ERROR`."]
-    SCode => SCODE, 
+    SCode => SCODE,
     VT_ERROR
 );
 impl_safe_arr_elem!(
     #[doc="`SafeArrayElement` impl for ['VariantBool']. This allows it to be converted into SAFEARRAY with vt = `VT_BOOL`."]
-    VariantBool => VARIANT_BOOL, 
+    VariantBool => VARIANT_BOOL,
     VT_BOOL
 );
 
@@ -333,7 +333,7 @@ impl SafeArrayElement for Variants {
         <Self as SafeArrayPtrElement>::into_safearray(self, psa, ix)
     }
 }
-impl SafeArrayElement for Box<VariantWrapper> {
+impl SafeArrayElement for Box<dyn VariantWrapper> {
     const SFTYPE: u32 = VT_VARIANT;
     type Element = Ptr<VARIANT, VariantDestructor>;
 
@@ -350,7 +350,7 @@ impl SafeArrayElement for Box<VariantWrapper> {
 
 impl_safe_arr_elem!(
     #[doc="`SafeArrayElement` impl for ['DecWrapper']. This allows it to be converted into SAFEARRAY with vt = `VT_DECIMAL`."]
-    DecWrapper => DECIMAL, 
+    DecWrapper => DECIMAL,
     VT_DECIMAL
 );
 //VT_RECORD
@@ -376,12 +376,12 @@ impl_safe_arr_elem!(
 );
 impl_safe_arr_elem!(
     #[doc="`SafeArrayElement` impl for [`Int`]. This allows it to be converted into SAFEARRAY with vt = `VT_INT`."]
-    Int => i32, 
+    Int => i32,
     VT_INT
 );
 impl_safe_arr_elem!(
     #[doc="`SafeArrayElement` impl for [`UInt`]. This allows it to be converted into SAFEARRAY with vt = `VT_INT`."]
-    UInt => u32, 
+    UInt => u32,
     VT_UINT
 );
 
@@ -517,7 +517,7 @@ where
         assert!(!psa.is_null());
         let psa: Ptr<SAFEARRAY, SafeArrayDestructor> = Ptr::with_checked(psa).unwrap();
 
-        for (ix, mut elem) in self.enumerate() {
+        for (ix, elem) in self.enumerate() {
             match <Itr::Item as SafeArrayElement>::into_safearray(elem, psa.as_ptr(), ix as i32) {
                 Ok(()) => continue,
                 //Safe-ish to do because memory allocated will be freed.

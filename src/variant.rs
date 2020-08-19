@@ -306,7 +306,7 @@ pub(crate) mod private {
             }
         }
     }
-    impl<VD> VariantAccess<VD> for Box<VariantWrapper>
+    impl<VD> VariantAccess<VD> for Box<dyn VariantWrapper>
     where
         VD: PtrDestructor<VARIANT>,
     {
@@ -379,7 +379,6 @@ pub(crate) mod private {
         }
         fn into_var(_inner: Self::Field, _n1: &mut VARIANT_n1, _n3: &mut VARIANT_n3) {}
     }
-
 }
 
 /// Container for variant-compatible types. Wrap them with this
@@ -758,16 +757,16 @@ where
     }
 }
 
-impl<D> TryConvert<Box<VariantWrapper<D>>, ElementError> for Ptr<VARIANT, D>
+impl<D> TryConvert<Box<dyn VariantWrapper<D>>, ElementError> for Ptr<VARIANT, D>
 where
     D: PtrDestructor<VARIANT>,
 {
-    fn try_convert(vw: Box<VariantWrapper<D>>) -> Result<Ptr<VARIANT, D>, ElementError> {
+    fn try_convert(vw: Box<dyn VariantWrapper<D>>) -> Result<Ptr<VARIANT, D>, ElementError> {
         Ok(vw.into_var()?)
     }
 }
 
-impl<D> TryConvert<Ptr<VARIANT, D>, ElementError> for Box<VariantWrapper<D>>
+impl<D> TryConvert<Ptr<VARIANT, D>, ElementError> for Box<dyn VariantWrapper<D>>
 where
     D: PtrDestructor<VARIANT>,
 {
@@ -1006,7 +1005,7 @@ mod test {
     fn varwrapper() {
         use crate::SafeArrayExt;
         use std::vec::IntoIter;
-        let v: Vec<Box<VariantWrapper>> = vec![
+        let v: Vec<Box<dyn VariantWrapper>> = vec![
             Box::new(Variants::Byte(-67)),
             Box::new(Variants::UShort(10000)),
         ];

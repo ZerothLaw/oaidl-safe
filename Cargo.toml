@@ -9,15 +9,16 @@ readme = "README.md"
 keywords = ["COM", "interop", "safearray", "variant"]
 categories = ["api-bindings", "development-tools::ffi", "os::windows-apis"]
 documentation = "https://docs.rs/oaidl/0.2.1/x86_64-pc-windows-msvc/oaidl/"
+edition = "2018"
 
 [dependencies]
 # mandatory packages
 rust_decimal = "0.10.1"
 widestring = "0.4.0"
 winapi = {version = "0.3.6", features = ["minwindef", "ntdef", "oaidl", "oleauto", "unknwnbase", "wtypes"]}
-failure = "0.1.2"
+thiserror = "1"
 
-# Optional packages 
+# Optional packages
 serde = {version = "1.0", optional = true, features = ["derive"]}
 
 [features]
